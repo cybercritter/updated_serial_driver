@@ -1,0 +1,6 @@
+{
+  "sonarlint.connectedMode.project": {
+    "connectionId": "cybercritter",
+    "projectKey": "cybercritter_updated_serial_driver"
+  }
+}

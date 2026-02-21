@@ -33,3 +33,32 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+  docs:
+    name: Generate Docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DSERIAL_DRIVER_BUILD_TESTS=OFF
+          -DSERIAL_DRIVER_BUILD_DOCS=ON
+
+      - name: Generate documentation
+        run: cmake --build build --target docs --parallel
+
+      - name: Upload documentation
+        uses: actions/upload-artifact@v3
+        with:
+          name: documentation
+          path: build/docs
