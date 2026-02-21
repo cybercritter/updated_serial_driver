@@ -10,34 +10,22 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/**
- * @brief Status codes returned by serial driver queue operations.
- */
-typedef enum {
-    /** Operation completed successfully. */
-    SERIAL_DRIVER_OK = 0,
-    /** Invalid function argument or invalid driver state. */
-    SERIAL_DRIVER_INVALID_ARG,
-    /** TX queue cannot accept additional bytes. */
-    SERIAL_DRIVER_BUFFER_FULL,
-    /** TX queue has no data available to read. */
-    SERIAL_DRIVER_BUFFER_EMPTY
-} serial_driver_status_t;
+#include "serial_driver/registers.h"
 
 /**
  * @brief Software TX circular buffer state.
  */
 typedef struct {
-    /** Backing storage for queued TX bytes. */
-    uint8_t *tx_buffer;
-    /** Size of @ref tx_buffer in bytes. */
-    size_t tx_capacity;
-    /** Write index for the next queued byte. */
-    size_t tx_head;
-    /** Read index for the next byte to transmit. */
-    size_t tx_tail;
-    /** Tracks whether @ref serial_driver_init has completed successfully. */
-    bool initialized;
+  /** Backing storage for queued TX bytes. */
+  uint8_t *tx_buffer;
+  /** Size of @ref tx_buffer in bytes. */
+  size_t tx_capacity;
+  /** Write index for the next queued byte. */
+  size_t tx_head;
+  /** Read index for the next byte to transmit. */
+  size_t tx_tail;
+  /** Tracks whether @ref serial_driver_init has completed successfully. */
+  bool initialized;
 } serial_driver_t;
 
 /**
@@ -48,10 +36,8 @@ typedef struct {
  * @param tx_capacity Capacity of @p tx_buffer (must be >= 2).
  * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
  */
-serial_driver_status_t serial_driver_init(
-    serial_driver_t *driver,
-    uint8_t *tx_buffer,
-    size_t tx_capacity);
+uart_error_t serial_driver_init(serial_driver_t *driver, uint8_t *tx_buffer,
+                                size_t tx_capacity);
 
 /**
  * @brief Queue one byte for transmit.
@@ -60,9 +46,7 @@ serial_driver_status_t serial_driver_init(
  * @param byte Byte to enqueue.
  * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
  */
-serial_driver_status_t serial_driver_write_byte(
-    serial_driver_t *driver,
-    uint8_t byte);
+uart_error_t serial_driver_write_byte(serial_driver_t *driver, uint8_t byte);
 
 /**
  * @brief Read and remove the next queued TX byte.
@@ -71,9 +55,8 @@ serial_driver_status_t serial_driver_write_byte(
  * @param out_byte Output pointer for the dequeued byte.
  * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
  */
-serial_driver_status_t serial_driver_read_next_tx(
-    serial_driver_t *driver,
-    uint8_t *out_byte);
+uart_error_t serial_driver_read_next_tx(serial_driver_t *driver,
+                                        uint8_t *out_byte);
 
 /**
  * @brief Return number of queued TX bytes currently pending.

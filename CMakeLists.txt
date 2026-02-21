@@ -14,6 +14,16 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(SERIAL_DRIVER_BUILD_TESTS "Build unit tests" ON)
 option(SERIAL_DRIVER_BUILD_DOCS "Generate API documentation with Doxygen" ON)
+option(SERIAL_DRIVER_ENABLE_COVERAGE "Enable code coverage instrumentation (GCC/Clang only)" OFF)
+
+if(SERIAL_DRIVER_ENABLE_COVERAGE)
+    if(NOT CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        message(FATAL_ERROR "Code coverage is only supported with GCC or Clang.")
+    endif()
+
+    add_compile_options(-O0 -g --coverage)
+    add_link_options(--coverage)
+endif()
 
 add_library(serial_driver
     src/serial_driver.c
@@ -79,4 +89,31 @@ if(SERIAL_DRIVER_BUILD_TESTS)
 
     include(GoogleTest)
     gtest_discover_tests(serial_driver_tests)
+
+    if(SERIAL_DRIVER_ENABLE_COVERAGE)
+        find_program(GCOVR_EXECUTABLE gcovr)
+        if(GCOVR_EXECUTABLE)
+            add_custom_target(coverage
+                COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+                COMMAND ${GCOVR_EXECUTABLE}
+                    --root ${CMAKE_CURRENT_SOURCE_DIR}
+                    --object-directory ${CMAKE_CURRENT_BINARY_DIR}
+                    --exclude-directories ${CMAKE_CURRENT_BINARY_DIR}/_deps
+                    --print-summary
+                    --xml-pretty --output coverage.xml
+                    --html-details coverage.html
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+                DEPENDS serial_driver_tests
+                COMMENT "Running tests and generating coverage reports"
+            )
+        else()
+            message(STATUS "gcovr not found. Coverage reports target will not be available.")
+        endif()
+    endif()
 endif()
+
+# Packaging
+set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_GENERATOR "TGZ" CACHE STRING "CPack generator to use (e.g. TGZ;ZIP;DEB;RPM)")
+include(CPack)
