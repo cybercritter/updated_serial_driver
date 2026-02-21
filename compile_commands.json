@@ -1,0 +1,44 @@
+[
+{
+  "directory": "/home/mreid/projects/updated_serial_driver/build",
+  "command": "/usr/bin/cc  -I/home/mreid/projects/updated_serial_driver/include -std=c11 -o CMakeFiles/serial_driver.dir/src/serial_driver.c.o -c /home/mreid/projects/updated_serial_driver/src/serial_driver.c",
+  "file": "/home/mreid/projects/updated_serial_driver/src/serial_driver.c",
+  "output": "CMakeFiles/serial_driver.dir/src/serial_driver.c.o"
+},
+{
+  "directory": "/home/mreid/projects/updated_serial_driver/build",
+  "command": "/usr/bin/cc  -I/home/mreid/projects/updated_serial_driver/include -std=c11 -o CMakeFiles/serial_driver.dir/src/registers.c.o -c /home/mreid/projects/updated_serial_driver/src/registers.c",
+  "file": "/home/mreid/projects/updated_serial_driver/src/registers.c",
+  "output": "CMakeFiles/serial_driver.dir/src/registers.c.o"
+},
+{
+  "directory": "/home/mreid/projects/updated_serial_driver/build",
+  "command": "/usr/bin/c++  -I/home/mreid/projects/updated_serial_driver/include -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/include -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest -std=c++17 -o CMakeFiles/serial_driver_tests.dir/tests/test_serial_driver.cpp.o -c /home/mreid/projects/updated_serial_driver/tests/test_serial_driver.cpp",
+  "file": "/home/mreid/projects/updated_serial_driver/tests/test_serial_driver.cpp",
+  "output": "CMakeFiles/serial_driver_tests.dir/tests/test_serial_driver.cpp.o"
+},
+{
+  "directory": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-build/googlemock",
+  "command": "/usr/bin/c++  -I/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock/include -I/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/include -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest -std=c++17 -Wall -Wshadow -Wundef -Wno-error=dangling-else -DGTEST_HAS_PTHREAD=1 -fexceptions -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -o CMakeFiles/gmock.dir/src/gmock-all.cc.o -c /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock/src/gmock-all.cc",
+  "file": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock/src/gmock-all.cc",
+  "output": "_deps/googletest-build/googlemock/CMakeFiles/gmock.dir/src/gmock-all.cc.o"
+},
+{
+  "directory": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-build/googlemock",
+  "command": "/usr/bin/c++  -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock/include -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/include -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest -std=c++17 -Wall -Wshadow -Wundef -Wno-error=dangling-else -DGTEST_HAS_PTHREAD=1 -fexceptions -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -o CMakeFiles/gmock_main.dir/src/gmock_main.cc.o -c /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock/src/gmock_main.cc",
+  "file": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock/src/gmock_main.cc",
+  "output": "_deps/googletest-build/googlemock/CMakeFiles/gmock_main.dir/src/gmock_main.cc.o"
+},
+{
+  "directory": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-build/googletest",
+  "command": "/usr/bin/c++  -I/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/include -I/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest -std=c++17 -Wall -Wshadow -Wundef -Wno-error=dangling-else -DGTEST_HAS_PTHREAD=1 -fexceptions -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -o CMakeFiles/gtest.dir/src/gtest-all.cc.o -c /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/src/gtest-all.cc",
+  "file": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/src/gtest-all.cc",
+  "output": "_deps/googletest-build/googletest/CMakeFiles/gtest.dir/src/gtest-all.cc.o"
+},
+{
+  "directory": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-build/googletest",
+  "command": "/usr/bin/c++  -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/include -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest -std=c++17 -Wall -Wshadow -Wundef -Wno-error=dangling-else -DGTEST_HAS_PTHREAD=1 -fexceptions -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -o CMakeFiles/gtest_main.dir/src/gtest_main.cc.o -c /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/src/gtest_main.cc",
+  "file": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/src/gtest_main.cc",
+  "output": "_deps/googletest-build/googletest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o"
+}
+]
