@@ -20,6 +20,9 @@ if(SERIAL_DRIVER_ENABLE_COVERAGE)
     if(NOT CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         message(FATAL_ERROR "Code coverage is only supported with GCC or Clang.")
     endif()
+    if(NOT SERIAL_DRIVER_BUILD_TESTS)
+        message(FATAL_ERROR "Code coverage requires SERIAL_DRIVER_BUILD_TESTS=ON.")
+    endif()
 
     add_compile_options(-O0 -g --coverage)
     add_link_options(--coverage)
@@ -93,11 +96,14 @@ if(SERIAL_DRIVER_BUILD_TESTS)
     if(SERIAL_DRIVER_ENABLE_COVERAGE)
         find_program(GCOVR_EXECUTABLE gcovr)
         if(GCOVR_EXECUTABLE)
-            add_custom_target(coverage
+            add_custom_target(coverage ALL
                 COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
                 COMMAND ${GCOVR_EXECUTABLE}
                     --root ${CMAKE_CURRENT_SOURCE_DIR}
                     --object-directory ${CMAKE_CURRENT_BINARY_DIR}
+                    --filter ${CMAKE_CURRENT_SOURCE_DIR}/src
+                    --filter ${CMAKE_CURRENT_SOURCE_DIR}/include
+                    --exclude ".*/_deps/.*"
                     --exclude-directories ${CMAKE_CURRENT_BINARY_DIR}/_deps
                     --print-summary
                     --xml-pretty --output coverage.xml
@@ -107,7 +113,7 @@ if(SERIAL_DRIVER_BUILD_TESTS)
                 COMMENT "Running tests and generating coverage reports"
             )
         else()
-            message(STATUS "gcovr not found. Coverage reports target will not be available.")
+            message(FATAL_ERROR "SERIAL_DRIVER_ENABLE_COVERAGE=ON requires gcovr in PATH.")
         endif()
     endif()
 endif()

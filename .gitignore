@@ -60,7 +60,7 @@ dkms.conf
 *.gcov      
 
 # Build directories
-build/
+**/build*/**
 out/
 dist/
 bin/
