@@ -53,3 +53,20 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Generated files
+*.gcno
+*.gcda
+*.gcov      
+
+# Build directories
+build/
+out/
+dist/
+bin/
+obj/    
+
+# CMake files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake     
