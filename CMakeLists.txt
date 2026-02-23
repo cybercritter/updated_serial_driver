@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(updated_serial_driver VERSION 0.1.0 LANGUAGES C CXX)
+file(REAL_PATH "${CMAKE_CURRENT_SOURCE_DIR}" SERIAL_DRIVER_SOURCE_ROOT)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -95,26 +96,33 @@ if(SERIAL_DRIVER_BUILD_TESTS)
 
     if(SERIAL_DRIVER_ENABLE_COVERAGE)
         find_program(GCOVR_EXECUTABLE gcovr)
-        if(GCOVR_EXECUTABLE)
-            add_custom_target(coverage ALL
-                COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
-                COMMAND ${GCOVR_EXECUTABLE}
-                    --root ${CMAKE_CURRENT_SOURCE_DIR}
-                    --object-directory ${CMAKE_CURRENT_BINARY_DIR}
-                    --filter ${CMAKE_CURRENT_SOURCE_DIR}/src
-                    --filter ${CMAKE_CURRENT_SOURCE_DIR}/include
-                    --exclude ".*/_deps/.*"
-                    --exclude-directories ${CMAKE_CURRENT_BINARY_DIR}/_deps
-                    --print-summary
-                    --xml-pretty --output coverage.xml
-                    --html-details coverage.html
-                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-                DEPENDS serial_driver_tests
-                COMMENT "Running tests and generating coverage reports"
-            )
-        else()
+        if(NOT GCOVR_EXECUTABLE)
             message(FATAL_ERROR "SERIAL_DRIVER_ENABLE_COVERAGE=ON requires gcovr in PATH.")
         endif()
+        find_program(FIND_EXECUTABLE find)
+        if(NOT FIND_EXECUTABLE)
+            message(FATAL_ERROR "SERIAL_DRIVER_ENABLE_COVERAGE=ON requires 'find' in PATH.")
+        endif()
+
+        add_custom_target(coverage
+            COMMAND ${FIND_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR} -name "*.gcda" -delete
+            COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+            COMMAND ${GCOVR_EXECUTABLE}
+                --root ${SERIAL_DRIVER_SOURCE_ROOT}
+                --object-directory ${CMAKE_CURRENT_BINARY_DIR}
+                --gcov-ignore-errors=no_working_dir_found
+                --filter "${SERIAL_DRIVER_SOURCE_ROOT}/src/"
+                --filter "${SERIAL_DRIVER_SOURCE_ROOT}/include/"
+                --exclude ".*/_deps/.*"
+                --exclude-directories ${CMAKE_CURRENT_BINARY_DIR}/_deps
+                --print-summary
+                --xml-pretty --output coverage.xml
+                --html-details coverage.html
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+            DEPENDS serial_driver_tests
+            COMMENT "Running tests and generating coverage reports"
+            VERBATIM
+        )
     endif()
 endif()
 
