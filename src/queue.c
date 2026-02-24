@@ -3,7 +3,7 @@
 static size_t queue_next_index(const serial_queue_t *queue, size_t current)
 {
     (void)queue;
-    return (current + 1U) % SERIAL_QUEUE_FIXED_SIZE_BYTES;
+    return (current + 1U) % SERIAL_QUEUE_FIXED_SIZE_WORDS;
 }
 
 uart_error_t serial_queue_init(serial_queue_t *queue)
@@ -19,7 +19,7 @@ uart_error_t serial_queue_init(serial_queue_t *queue)
     return UART_ERROR_NONE;
 }
 
-uart_error_t serial_queue_push(serial_queue_t *queue, uint8_t value)
+uart_error_t serial_queue_push(serial_queue_t *queue, uint32_t value)
 {
     size_t next_head = 0U;
 
@@ -27,7 +27,7 @@ uart_error_t serial_queue_push(serial_queue_t *queue, uint8_t value)
         return UART_ERROR_NOT_INITIALIZED;
     }
 
-    if (queue->count == SERIAL_QUEUE_FIXED_SIZE_BYTES) {
+    if (queue->count == SERIAL_QUEUE_FIXED_SIZE_WORDS) {
         return UART_ERROR_FIFO_FULL;
     }
 
@@ -38,7 +38,7 @@ uart_error_t serial_queue_push(serial_queue_t *queue, uint8_t value)
     return UART_ERROR_NONE;
 }
 
-uart_error_t serial_queue_pop(serial_queue_t *queue, uint8_t *out_value)
+uart_error_t serial_queue_pop(serial_queue_t *queue, uint32_t *out_value)
 {
     if (queue == NULL || out_value == NULL) {
         return UART_ERROR_INVALID_ARG;
@@ -78,5 +78,5 @@ bool serial_queue_is_full(const serial_queue_t *queue)
         return false;
     }
 
-    return queue->count == SERIAL_QUEUE_FIXED_SIZE_BYTES;
+    return queue->count == SERIAL_QUEUE_FIXED_SIZE_WORDS;
 }

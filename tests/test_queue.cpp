@@ -12,7 +12,7 @@ TEST(SerialQueueTest, InitRejectsNull) {
 
 TEST(SerialQueueTest, InvalidAndUninitializedPathsAreReported) {
   serial_queue_t queue = {};
-  uint8_t value = 0U;
+  uint32_t value = 0U;
 
   EXPECT_EQ(serial_queue_push(nullptr, 0x11U), UART_ERROR_NOT_INITIALIZED);
   EXPECT_EQ(serial_queue_push(&queue, 0x11U), UART_ERROR_NOT_INITIALIZED);
@@ -29,24 +29,24 @@ TEST(SerialQueueTest, InvalidAndUninitializedPathsAreReported) {
 
 TEST(SerialQueueTest, PushPopMaintainsOrder) {
   serial_queue_t queue = {};
-  uint8_t value = 0U;
+  uint32_t value = 0U;
 
   ASSERT_EQ(serial_queue_init(&queue), UART_ERROR_NONE);
   ASSERT_TRUE(serial_queue_is_empty(&queue));
 
-  ASSERT_EQ(serial_queue_push(&queue, 0x11U), UART_ERROR_NONE);
-  ASSERT_EQ(serial_queue_push(&queue, 0x22U), UART_ERROR_NONE);
-  ASSERT_EQ(serial_queue_push(&queue, 0x33U), UART_ERROR_NONE);
+  ASSERT_EQ(serial_queue_push(&queue, 0x11111111U), UART_ERROR_NONE);
+  ASSERT_EQ(serial_queue_push(&queue, 0x22222222U), UART_ERROR_NONE);
+  ASSERT_EQ(serial_queue_push(&queue, 0x33333333U), UART_ERROR_NONE);
 
   EXPECT_EQ(serial_queue_size(&queue), 3U);
   EXPECT_FALSE(serial_queue_is_empty(&queue));
 
   ASSERT_EQ(serial_queue_pop(&queue, &value), UART_ERROR_NONE);
-  EXPECT_EQ(value, 0x11U);
+  EXPECT_EQ(value, 0x11111111U);
   ASSERT_EQ(serial_queue_pop(&queue, &value), UART_ERROR_NONE);
-  EXPECT_EQ(value, 0x22U);
+  EXPECT_EQ(value, 0x22222222U);
   ASSERT_EQ(serial_queue_pop(&queue, &value), UART_ERROR_NONE);
-  EXPECT_EQ(value, 0x33U);
+  EXPECT_EQ(value, 0x33333333U);
 
   EXPECT_EQ(serial_queue_size(&queue), 0U);
   EXPECT_TRUE(serial_queue_is_empty(&queue));
@@ -54,19 +54,19 @@ TEST(SerialQueueTest, PushPopMaintainsOrder) {
 
 TEST(SerialQueueTest, FullAndEmptyStatesAreReported) {
   serial_queue_t queue = {};
-  uint8_t value = 0U;
+  uint32_t value = 0U;
 
   ASSERT_EQ(serial_queue_init(&queue), UART_ERROR_NONE);
 
-  for (size_t i = 0U; i < SERIAL_QUEUE_FIXED_SIZE_BYTES; ++i) {
-    ASSERT_EQ(serial_queue_push(&queue, static_cast<uint8_t>(i & 0xFFU)),
+  for (size_t i = 0U; i < SERIAL_QUEUE_FIXED_SIZE_WORDS; ++i) {
+    ASSERT_EQ(serial_queue_push(&queue, static_cast<uint32_t>(i)),
               UART_ERROR_NONE);
   }
 
   EXPECT_TRUE(serial_queue_is_full(&queue));
   EXPECT_EQ(serial_queue_push(&queue, 0xEEU), UART_ERROR_FIFO_FULL);
 
-  for (size_t i = 0U; i < SERIAL_QUEUE_FIXED_SIZE_BYTES; ++i) {
+  for (size_t i = 0U; i < SERIAL_QUEUE_FIXED_SIZE_WORDS; ++i) {
     ASSERT_EQ(serial_queue_pop(&queue, &value), UART_ERROR_NONE);
   }
 
@@ -76,12 +76,12 @@ TEST(SerialQueueTest, FullAndEmptyStatesAreReported) {
 
 TEST(SerialQueueTest, WrapAroundAfterPop) {
   serial_queue_t queue = {};
-  uint8_t value = 0U;
+  uint32_t value = 0U;
 
   ASSERT_EQ(serial_queue_init(&queue), UART_ERROR_NONE);
 
-  for (size_t i = 0U; i < SERIAL_QUEUE_FIXED_SIZE_BYTES; ++i) {
-    ASSERT_EQ(serial_queue_push(&queue, static_cast<uint8_t>(i & 0xFFU)),
+  for (size_t i = 0U; i < SERIAL_QUEUE_FIXED_SIZE_WORDS; ++i) {
+    ASSERT_EQ(serial_queue_push(&queue, static_cast<uint32_t>(i)),
               UART_ERROR_NONE);
   }
 

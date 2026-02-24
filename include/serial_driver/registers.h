@@ -6,17 +6,19 @@
  * @brief Register and device definitions for 16550-compatible UARTs.
  */
 
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "serial_driver/errors.h"
 #include "serial_driver/queue.h"
 
 /** Number of UART device slots tracked in @ref uart_devices. */
-#define UART_DEVICE_COUNT 4U
+#define UART_DEVICE_COUNT 8U
 /** Number of UARTs represented in the read/write FIFO map. */
 #define UART_FIFO_UART_COUNT 8U
+/** Hardware/device FIFO capacity in bytes. */
+#define UART_DEVICE_FIFO_SIZE_BYTES 255U
 
 /**
  * @brief UART data register view at offset 0.
@@ -25,7 +27,7 @@
  * - DLAB=0: RBR (read) / THR (write)
  * - DLAB=1: DLL
  */
-typedef union {
+typedef union DataRegisters {
   volatile uint8_t rbr;
   volatile uint8_t thr;
   volatile uint8_t dll;
@@ -38,7 +40,7 @@ typedef union {
  * - DLAB=0: IER
  * - DLAB=1: DLM
  */
-typedef union {
+typedef union InterruptRegisters {
   volatile uint8_t ier;
   volatile uint8_t dlm;
 } uart16550_interrupt_reg_t;
@@ -49,7 +51,7 @@ typedef union {
  * - Read: IIR
  * - Write: FCR
  */
-typedef union {
+typedef union FifoRegisters {
   volatile uint8_t iir;
   volatile uint8_t fcr;
 } uart16550_fifo_reg_t;
@@ -57,7 +59,7 @@ typedef union {
 /**
  * @brief Memory-mapped layout for a 16550-compatible UART.
  */
-typedef struct {
+typedef struct UART16550Registers {
   /** Offset 0x00: RBR/THR/DLL depending on access and DLAB. */
   uart16550_data_reg_t data;
   /** Offset 0x01: IER/DLM depending on DLAB. */
@@ -79,7 +81,7 @@ typedef struct {
 /**
  * @brief Operating mode for a UART device slot.
  */
-typedef enum {
+typedef enum PORT_MODE {
   /** UART is configured for queued serial TX/RX behavior. */
   UART_PORT_MODE_SERIAL = 0,
   /** UART is configured for discrete/non-serial behavior. */
@@ -89,17 +91,31 @@ typedef enum {
 /**
  * @brief Read and write FIFO sets for multiple UARTs.
  */
-typedef struct {
+typedef struct UARTByteFifo {
+  /** Fixed-size byte storage for the FIFO. */
+  uint8_t data[UART_DEVICE_FIFO_SIZE_BYTES];
+  /** Index where next byte will be written. */
+  size_t head;
+  /** Index where next byte will be read. */
+  size_t tail;
+  /** Number of bytes currently stored. */
+  size_t count;
+} uart_byte_fifo_t;
+
+/**
+ * @brief Read and write FIFO sets for multiple UARTs.
+ */
+typedef struct UARTFifoMap {
   /** Per-UART transmit FIFOs. */
-  serial_queue_t write_fifos[UART_FIFO_UART_COUNT];
+  uart_byte_fifo_t write_fifos[UART_FIFO_UART_COUNT];
   /** Per-UART receive FIFOs. */
-  serial_queue_t read_fifos[UART_FIFO_UART_COUNT];
+  uart_byte_fifo_t read_fifos[UART_FIFO_UART_COUNT];
 } uart_fifo_map_t;
 
 /**
  * @brief Descriptor for one UART instance managed by the driver.
  */
-typedef struct {
+typedef struct UARTDevice {
   /** Pointer to memory-mapped UART register block. */
   uart16550_registers_t *registers;
   /** Human-readable device name (for logs/config selection). */

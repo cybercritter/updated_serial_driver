@@ -3,7 +3,7 @@
 
 /**
  * @file queue.h
- * @brief Simple byte-oriented circular queue utilities.
+ * @brief Simple 32-bit circular queue utilities.
  */
 
 #include <stdbool.h>
@@ -12,20 +12,20 @@
 
 #include "serial_driver/errors.h"
 
-/** Fixed queue storage size in bytes (1.2K). */
-#define SERIAL_QUEUE_FIXED_SIZE_BYTES 1200U
+/** Fixed queue storage size in 32-bit entries 300 entries(1.2K byte). */
+#define SERIAL_QUEUE_FIXED_SIZE_WORDS 300U
 
 /**
- * @brief Circular queue for byte storage.
+ * @brief Circular queue for 32-bit storage.
  */
 typedef struct {
   /** Fixed-size backing storage buffer. */
-  uint8_t buffer[SERIAL_QUEUE_FIXED_SIZE_BYTES];
-  /** Write index for next pushed byte. */
+  uint32_t buffer[SERIAL_QUEUE_FIXED_SIZE_WORDS];
+  /** Write index for next pushed word. */
   size_t head;
-  /** Read index for next popped byte. */
+  /** Read index for next popped word. */
   size_t tail;
-  /** Number of bytes currently queued. */
+  /** Number of 32-bit words currently queued. */
   size_t count;
   /** Set to true once queue has been initialized. */
   bool initialized;
@@ -40,28 +40,28 @@ typedef struct {
 uart_error_t serial_queue_init(serial_queue_t *queue);
 
 /**
- * @brief Push one byte into the queue.
+ * @brief Push one 32-bit word into the queue.
  *
  * @param queue Initialized queue context.
- * @param value Byte to enqueue.
+ * @param value Word to enqueue.
  * @return @ref UART_ERROR_NONE on success, otherwise an error code.
  */
-uart_error_t serial_queue_push(serial_queue_t *queue, uint8_t value);
+uart_error_t serial_queue_push(serial_queue_t *queue, uint32_t value);
 
 /**
- * @brief Pop one byte from the queue.
+ * @brief Pop one 32-bit word from the queue.
  *
  * @param queue Initialized queue context.
- * @param out_value Output pointer for popped byte.
+ * @param out_value Output pointer for popped word.
  * @return @ref UART_ERROR_NONE on success, otherwise an error code.
  */
-uart_error_t serial_queue_pop(serial_queue_t *queue, uint8_t *out_value);
+uart_error_t serial_queue_pop(serial_queue_t *queue, uint32_t *out_value);
 
 /**
- * @brief Return current queued byte count.
+ * @brief Return current queued word count.
  *
  * @param queue Queue context.
- * @return Number of bytes currently queued, or 0 for invalid queue.
+ * @return Number of words currently queued, or 0 for invalid queue.
  */
 size_t serial_queue_size(const serial_queue_t *queue);
 
