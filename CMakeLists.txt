@@ -32,6 +32,7 @@ endif()
 add_library(serial_driver
     src/serial_driver.c
     src/registers.c
+    src/queue.c
 )
 add_library(serial_driver::serial_driver ALIAS serial_driver)
 
@@ -83,6 +84,7 @@ if(SERIAL_DRIVER_BUILD_TESTS)
 
     add_executable(serial_driver_tests
         tests/test_serial_driver.cpp
+        tests/test_queue.cpp
     )
 
     target_link_libraries(serial_driver_tests
