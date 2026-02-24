@@ -428,6 +428,21 @@ TEST(SerialDriverTest, InitFailsWhenDescriptorMapIsFull) {
             SERIAL_DESCRIPTOR_INVALID);
 }
 
+TEST(SerialDriverTest, ReinitializingSamePortReturnsExistingDescriptor) {
+  serial_descriptor_t first = SERIAL_DESCRIPTOR_INVALID;
+  serial_descriptor_t second = SERIAL_DESCRIPTOR_INVALID;
+
+  ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
+
+  first = serial_port_init(SERIAL_PORT_3, UART_PORT_MODE_SERIAL);
+  ASSERT_NE(first, SERIAL_DESCRIPTOR_INVALID);
+
+  second = serial_port_init(SERIAL_PORT_3, UART_PORT_MODE_DISCRETE);
+  ASSERT_NE(second, SERIAL_DESCRIPTOR_INVALID);
+  EXPECT_EQ(second, first);
+  EXPECT_EQ(serial_driver_get_uart_device(second), &uart_devices[SERIAL_PORT_3]);
+}
+
 TEST_P(SerialDriverPortTest, DiscreteModeRejectsSerialOperations) {
   serial_descriptor_t descriptor = SERIAL_DESCRIPTOR_INVALID;
   uint32_t value = 0U;
