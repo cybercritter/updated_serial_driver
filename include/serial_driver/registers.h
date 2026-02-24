@@ -7,47 +7,16 @@
  */
 
 #include <stddef.h>
+#include <stdbool.h>
 #include <stdint.h>
 
-/** Capacity of each software TX/RX circular buffer in bytes. */
-#define UART_CIRCULAR_BUFFER_SIZE 256U
+#include "serial_driver/errors.h"
+#include "serial_driver/queue.h"
+
 /** Number of UART device slots tracked in @ref uart_devices. */
 #define UART_DEVICE_COUNT 4U
-
-/**
- * @brief Common UART and FIFO error/status codes.
- */
-typedef enum {
-  /** Operation completed successfully. */
-  UART_ERROR_NONE = 0,
-
-  /** One or more function arguments are invalid. */
-  UART_ERROR_INVALID_ARG,
-  /** Device or subsystem has not been initialized. */
-  UART_ERROR_NOT_INITIALIZED,
-  /** Device exists but required configuration was not applied. */
-  UART_ERROR_NOT_CONFIGURED,
-  /** Requested UART device identifier/name was not found. */
-  UART_ERROR_DEVICE_NOT_FOUND,
-  /** FIFO/circular buffer cannot accept more bytes. */
-  UART_ERROR_FIFO_FULL,
-  /** FIFO/circular buffer has no bytes available. */
-  UART_ERROR_FIFO_EMPTY,
-  /** A write exceeded available FIFO/circular buffer space. */
-  UART_ERROR_FIFO_OVERFLOW,
-  /** A read/remove was attempted on an empty FIFO/circular buffer. */
-  UART_ERROR_FIFO_UNDERFLOW,
-  /** Operation timed out before completion. */
-  UART_ERROR_TIMEOUT,
-  /** UART detected a parity error on received data. */
-  UART_ERROR_PARITY,
-  /** UART detected a framing error on received data. */
-  UART_ERROR_FRAMING,
-  /** UART receive overrun occurred. */
-  UART_ERROR_OVERRUN,
-  /** Non-specific hardware-level failure. */
-  UART_ERROR_HARDWARE_FAULT
-} uart_error_t;
+/** Number of UARTs represented in the read/write FIFO map. */
+#define UART_FIFO_UART_COUNT 8U
 
 /**
  * @brief UART data register view at offset 0.
@@ -108,18 +77,24 @@ typedef struct {
 } uart16550_registers_t;
 
 /**
- * @brief Generic circular buffer state used for UART TX and RX queues.
+ * @brief Operating mode for a UART device slot.
+ */
+typedef enum {
+  /** UART is configured for queued serial TX/RX behavior. */
+  UART_PORT_MODE_SERIAL = 0,
+  /** UART is configured for discrete/non-serial behavior. */
+  UART_PORT_MODE_DISCRETE
+} uart_port_mode_t;
+
+/**
+ * @brief Read and write FIFO sets for multiple UARTs.
  */
 typedef struct {
-  /** Backing storage for buffered bytes. */
-  uint8_t data[UART_CIRCULAR_BUFFER_SIZE];
-  /** Index where next byte is written. */
-  size_t head;
-  /** Index where next byte is read. */
-  size_t tail;
-  /** Number of valid bytes currently in the buffer. */
-  size_t count;
-} uart_circular_buffer_t;
+  /** Per-UART transmit FIFOs. */
+  serial_queue_t write_fifos[UART_FIFO_UART_COUNT];
+  /** Per-UART receive FIFOs. */
+  serial_queue_t read_fifos[UART_FIFO_UART_COUNT];
+} uart_fifo_map_t;
 
 /**
  * @brief Descriptor for one UART instance managed by the driver.
@@ -131,13 +106,19 @@ typedef struct {
   const char *device_name;
   /** Base address used to map/register this UART. */
   uintptr_t uart_base_address;
+  /** Active mode for this UART slot. */
+  uart_port_mode_t port_mode;
+  /** True once this UART slot has been configured. */
+  bool configured;
   /** Software transmit queue. */
-  uart_circular_buffer_t tx_circular_buffer;
+  serial_queue_t tx_queue;
   /** Software receive queue. */
-  uart_circular_buffer_t rx_circular_buffer;
+  serial_queue_t rx_queue;
 } uart_device_t;
 
 /** Global table of UART devices managed by the driver. */
 extern uart_device_t uart_devices[UART_DEVICE_COUNT];
+/** Global read/write FIFO map for 8 UART channels. */
+extern uart_fifo_map_t uart_fifo_map;
 
 #endif

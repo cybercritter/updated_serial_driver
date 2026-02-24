@@ -6,64 +6,96 @@
  * @brief Public API for the software serial TX queue.
  */
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include "serial_driver/registers.h"
+#include "registers.h"
+
+/** Opaque serial-driver descriptor returned by @ref serial_port_init. */
+typedef uint32_t serial_descriptor_t;
+
+/** Sentinel for an invalid descriptor. */
+#define SERIAL_DESCRIPTOR_INVALID ((serial_descriptor_t)0U)
 
 /**
- * @brief Software TX circular buffer state.
- */
-typedef struct {
-  /** Backing storage for queued TX bytes. */
-  uint8_t *tx_buffer;
-  /** Size of @ref tx_buffer in bytes. */
-  size_t tx_capacity;
-  /** Write index for the next queued byte. */
-  size_t tx_head;
-  /** Read index for the next byte to transmit. */
-  size_t tx_tail;
-  /** Tracks whether @ref serial_driver_init has completed successfully. */
-  bool initialized;
-} serial_driver_t;
-
-/**
- * @brief Initialize a serial driver TX queue with caller-provided storage.
+ * @brief Serial driver status/error codes.
  *
- * @param driver Driver context to initialize.
- * @param tx_buffer Storage buffer used as circular queue.
- * @param tx_capacity Capacity of @p tx_buffer (must be >= 2).
+ * Values are aligned with @ref uart_error_t for compatibility with existing
+ * UART-level error handling.
+ */
+typedef enum {
+  /** Operation completed successfully. */
+  SERIAL_DRIVER_OK = UART_ERROR_NONE,
+  /** One or more function arguments are invalid. */
+  SERIAL_DRIVER_ERROR_INVALID_ARG = UART_ERROR_INVALID_ARG,
+  /** Driver has not been initialized. */
+  SERIAL_DRIVER_ERROR_NOT_INITIALIZED = UART_ERROR_NOT_INITIALIZED,
+  /** UART was configured, but not in serial mode. */
+  SERIAL_DRIVER_ERROR_NOT_CONFIGURED = UART_ERROR_NOT_CONFIGURED,
+  /** TX queue has no free space for additional bytes. */
+  SERIAL_DRIVER_ERROR_TX_FULL = UART_ERROR_FIFO_FULL,
+  /** TX queue has no bytes available to read. */
+  SERIAL_DRIVER_ERROR_TX_EMPTY = UART_ERROR_FIFO_EMPTY
+} serial_driver_error_t;
+
+/**
+ * @brief Initialize common serial-driver state shared across UART ports.
+ *
+ * Must be called before @ref serial_port_init.
+ *
+ * @return @ref SERIAL_DRIVER_OK on success.
+ */
+serial_driver_error_t serial_driver_common_init(void);
+
+/**
+ * @brief Initialize one UART port instance and return its descriptor.
+ *
+ * @param uart_device UART device associated with this serial descriptor.
+ * @param tx_buffer Storage buffer used as circular queue when mode is serial.
+ * @param tx_capacity Capacity of @p tx_buffer in bytes (must be >= 5 when mode
+ * is serial).
+ * @param mode Configuration mode for this UART (serial or discrete).
+ * @return Valid serial descriptor on success, @ref SERIAL_DESCRIPTOR_INVALID on
+ * failure.
+ */
+serial_descriptor_t serial_port_init(uart_device_t *uart_device,
+                                     uint8_t *tx_buffer, size_t tx_capacity,
+                                     uart_port_mode_t mode);
+
+/**
+ * @brief Queue one 32-bit value for transmit.
+ *
+ * @param descriptor Initialized serial descriptor.
+ * @param value 32-bit value to enqueue.
  * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
  */
-uart_error_t serial_driver_init(serial_driver_t *driver, uint8_t *tx_buffer,
-                                size_t tx_capacity);
+serial_driver_error_t serial_driver_write_u32(serial_descriptor_t descriptor,
+                                              uint32_t value);
 
 /**
- * @brief Queue one byte for transmit.
+ * @brief Read and remove the next queued 32-bit TX value.
  *
- * @param driver Initialized driver context.
- * @param byte Byte to enqueue.
+ * @param descriptor Initialized serial descriptor.
+ * @param out_value Output pointer for the dequeued 32-bit value.
  * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
  */
-uart_error_t serial_driver_write_byte(serial_driver_t *driver, uint8_t byte);
-
-/**
- * @brief Read and remove the next queued TX byte.
- *
- * @param driver Initialized driver context.
- * @param out_byte Output pointer for the dequeued byte.
- * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
- */
-uart_error_t serial_driver_read_next_tx(serial_driver_t *driver,
-                                        uint8_t *out_byte);
+serial_driver_error_t serial_driver_read_next_tx_u32(
+    serial_descriptor_t descriptor, uint32_t *out_value);
 
 /**
  * @brief Return number of queued TX bytes currently pending.
  *
- * @param driver Driver context.
- * @return Number of queued bytes, or 0 if the driver is invalid/uninitialized.
+ * @param descriptor Serial descriptor.
+ * @return Number of queued bytes, or 0 if descriptor is invalid/uninitialized.
  */
-size_t serial_driver_pending_tx(const serial_driver_t *driver);
+size_t serial_driver_pending_tx(serial_descriptor_t descriptor);
+
+/**
+ * @brief Resolve descriptor to associated UART device.
+ *
+ * @param descriptor Serial descriptor.
+ * @return Mapped UART device pointer, or NULL if descriptor is invalid.
+ */
+uart_device_t *serial_driver_get_uart_device(serial_descriptor_t descriptor);
 
 #endif
