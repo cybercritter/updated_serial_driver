@@ -51,9 +51,9 @@ jobs:
         run: >
           cmake -S . -B build -G Ninja
           -DCMAKE_BUILD_TYPE=Debug
-          -DSERIAL_DRIVER_BUILD_TESTS=ON
-          -DSERIAL_DRIVER_BUILD_DOCS=OFF
-          -DSERIAL_DRIVER_ENABLE_COVERAGE=ON
+          -DDEVICE_DRIVER_BUILD_TESTS=ON
+          -DDEVICE_DRIVER_BUILD_DOCS=OFF
+          -DDEVICE_DRIVER_ENABLE_COVERAGE=ON
 
       - name: Build coverage target
         run: cmake --build build --target coverage --parallel
