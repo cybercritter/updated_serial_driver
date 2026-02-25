@@ -25,5 +25,13 @@
         }
       }
     ]
-  }
+  },
+  "cSpell.words": [
+    "CPACK",
+    "CTEST",
+    "Doxyfile",
+    "gcda",
+    "gcov",
+    "GCOVR"
+  ]
 }

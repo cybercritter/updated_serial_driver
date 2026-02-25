@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "serial_driver/serial_driver.h"
+#include "device_driver/device_driver.h"
 
 typedef struct SerialDescriptorEntry {
   uart_device_t *uart_device;

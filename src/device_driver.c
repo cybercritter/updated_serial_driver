@@ -1,4 +1,4 @@
-#include "serial_driver/serial_driver_internal.h"
+#include "device_driver/device_driver_internal.h"
 
 serial_descriptor_entry_t serial_descriptor_map[UART_DEVICE_COUNT] = {0};
 bool serial_driver_common_initialized = false;

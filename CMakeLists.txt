@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(updated_serial_driver VERSION 0.1.0 LANGUAGES C CXX)
-file(REAL_PATH "${CMAKE_CURRENT_SOURCE_DIR}" SERIAL_DRIVER_SOURCE_ROOT)
+project(updated_device_driver VERSION 0.1.0 LANGUAGES C CXX)
+file(REAL_PATH "${CMAKE_CURRENT_SOURCE_DIR}" DEVICE_DRIVER_SOURCE_ROOT)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -13,37 +13,37 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(SERIAL_DRIVER_BUILD_TESTS "Build unit tests" ON)
-option(SERIAL_DRIVER_BUILD_DOCS "Generate API documentation with Doxygen" ON)
-option(SERIAL_DRIVER_ENABLE_COVERAGE "Enable code coverage instrumentation (GCC/Clang only)" OFF)
+option(DEVICE_DRIVER_BUILD_TESTS "Build unit tests" ON)
+option(DEVICE_DRIVER_BUILD_DOCS "Generate API documentation with Doxygen" ON)
+option(DEVICE_DRIVER_ENABLE_COVERAGE "Enable code coverage instrumentation (GCC/Clang only)" OFF)
 
-if(SERIAL_DRIVER_ENABLE_COVERAGE)
+if(DEVICE_DRIVER_ENABLE_COVERAGE)
     if(NOT CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         message(FATAL_ERROR "Code coverage is only supported with GCC or Clang.")
     endif()
-    if(NOT SERIAL_DRIVER_BUILD_TESTS)
-        message(FATAL_ERROR "Code coverage requires SERIAL_DRIVER_BUILD_TESTS=ON.")
+    if(NOT DEVICE_DRIVER_BUILD_TESTS)
+        message(FATAL_ERROR "Code coverage requires DEVICE_DRIVER_BUILD_TESTS=ON.")
     endif()
 
     add_compile_options(-O0 -g --coverage)
     add_link_options(--coverage)
 endif()
 
-add_library(serial_driver
-    src/serial_driver.c
-    src/serial_driver_tx.c
-    src/serial_driver_rx.c
+add_library(device_driver
+    src/device_driver.c
+    src/device_driver_tx.c
+    src/device_driver_rx.c
     src/registers.c
     src/queue.c
 )
-add_library(serial_driver::serial_driver ALIAS serial_driver)
+add_library(device_driver::device_driver ALIAS device_driver)
 
-target_include_directories(serial_driver
+target_include_directories(device_driver
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-if(SERIAL_DRIVER_BUILD_DOCS)
+if(DEVICE_DRIVER_BUILD_DOCS)
     find_package(Doxygen QUIET)
     if(Doxygen_FOUND)
         set(DOXYGEN_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/docs)
@@ -71,7 +71,7 @@ if(SERIAL_DRIVER_BUILD_DOCS)
     endif()
 endif()
 
-if(SERIAL_DRIVER_BUILD_TESTS)
+if(DEVICE_DRIVER_BUILD_TESTS)
     include(FetchContent)
 
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -84,51 +84,59 @@ if(SERIAL_DRIVER_BUILD_TESTS)
 
     enable_testing()
 
-    add_executable(serial_driver_tests
-        tests/test_serial_driver.cpp
+    add_executable(device_driver_tests
+        tests/test_device_driver.cpp
         tests/test_queue.cpp
     )
 
-    target_link_libraries(serial_driver_tests
+    target_link_libraries(device_driver_tests
         PRIVATE
-            serial_driver::serial_driver
+            device_driver::device_driver
             GTest::gtest_main
     )
 
     include(GoogleTest)
-    gtest_discover_tests(serial_driver_tests)
+    gtest_discover_tests(device_driver_tests)
 
-    if(SERIAL_DRIVER_ENABLE_COVERAGE)
+    if(DEVICE_DRIVER_ENABLE_COVERAGE)
         find_program(GCOVR_EXECUTABLE gcovr)
         if(NOT GCOVR_EXECUTABLE)
-            message(FATAL_ERROR "SERIAL_DRIVER_ENABLE_COVERAGE=ON requires gcovr in PATH.")
+            message(FATAL_ERROR "DEVICE_DRIVER_ENABLE_COVERAGE=ON requires gcovr in PATH.")
         endif()
         find_program(FIND_EXECUTABLE find)
         if(NOT FIND_EXECUTABLE)
-            message(FATAL_ERROR "SERIAL_DRIVER_ENABLE_COVERAGE=ON requires 'find' in PATH.")
+            message(FATAL_ERROR "DEVICE_DRIVER_ENABLE_COVERAGE=ON requires 'find' in PATH.")
         endif()
 
         add_custom_target(coverage
             COMMAND ${FIND_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR} -name "*.gcda" -delete
             COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
             COMMAND ${GCOVR_EXECUTABLE}
-                --root ${SERIAL_DRIVER_SOURCE_ROOT}
+                --root ${DEVICE_DRIVER_SOURCE_ROOT}
                 --object-directory ${CMAKE_CURRENT_BINARY_DIR}
                 --gcov-ignore-errors=no_working_dir_found
-                --filter "${SERIAL_DRIVER_SOURCE_ROOT}/src/"
-                --filter "${SERIAL_DRIVER_SOURCE_ROOT}/include/"
+                --filter "${DEVICE_DRIVER_SOURCE_ROOT}/src/"
+                --filter "${DEVICE_DRIVER_SOURCE_ROOT}/include/"
                 --exclude ".*/_deps/.*"
                 --exclude-directories ${CMAKE_CURRENT_BINARY_DIR}/_deps
                 --print-summary
                 --xml-pretty --output coverage.xml
                 --html-details coverage.html
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-            DEPENDS serial_driver_tests
+            DEPENDS device_driver_tests
             COMMENT "Running tests and generating coverage reports"
             VERBATIM
         )
     endif()
 endif()
+
+add_executable(device_driver_test_main
+    tests/device_driver_test_main.c
+)
+target_link_libraries(device_driver_test_main
+    PRIVATE
+        device_driver::device_driver
+)
 
 # Packaging
 set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")

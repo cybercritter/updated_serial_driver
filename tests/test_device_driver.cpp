@@ -4,8 +4,8 @@
 #include <string>
 
 extern "C" {
-#include "serial_driver/serial_driver.h"
-#include "serial_driver/serial_driver_internal.h"
+#include "device_driver/device_driver.h"
+#include "device_driver/device_driver_internal.h"
 }
 
 #include <gtest/gtest.h>

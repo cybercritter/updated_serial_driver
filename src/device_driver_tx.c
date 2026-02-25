@@ -1,4 +1,4 @@
-#include "serial_driver/serial_driver_internal.h"
+#include "device_driver/device_driver_internal.h"
 
 serial_driver_error_t serial_driver_write_u32(serial_descriptor_t descriptor,
                                               uint32_t value) {

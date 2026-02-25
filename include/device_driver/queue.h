@@ -10,7 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "serial_driver/errors.h"
+#include "device_driver/errors.h"
 
 /** Fixed queue storage size in 32-bit entries 300 entries(1.2K byte). */
 #define SERIAL_QUEUE_FIXED_SIZE_WORDS 300U

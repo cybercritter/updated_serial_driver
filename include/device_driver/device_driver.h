@@ -2,7 +2,7 @@
 #define SERIAL_DRIVER_SERIAL_DRIVER_H
 
 /**
- * @file serial_driver.h
+ * @file device_driver.h
  * @brief Public API for the software serial TX queue.
  */
 

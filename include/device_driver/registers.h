@@ -10,8 +10,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "serial_driver/errors.h"
-#include "serial_driver/queue.h"
+#include "device_driver/errors.h"
+#include "device_driver/queue.h"
 
 /** Number of UART device slots tracked in @ref uart_devices. */
 #define UART_DEVICE_COUNT 8U

@@ -14,13 +14,13 @@ This repository provides:
 ## Project layout
 
 - `CMakeLists.txt`: build configuration, library target, and test integration.
-- `include/serial_driver/serial_driver.h`: public serial driver API.
-- `src/serial_driver.c`: descriptor/state lifecycle and shared internals.
-- `src/serial_driver_tx.c`: TX path implementation.
-- `src/serial_driver_rx.c`: RX path and poll implementation.
-- `include/serial_driver/registers.h`: 16550 register map, UART/FIFO errors, and device descriptors.
+- `include/device_driver/device_driver.h`: public serial driver API.
+- `src/device_driver.c`: descriptor/state lifecycle and shared internals.
+- `src/device_driver_tx.c`: TX path implementation.
+- `src/device_driver_rx.c`: RX path and poll implementation.
+- `include/device_driver/registers.h`: 16550 register map, UART/FIFO errors, and device descriptors.
 - `src/registers.c`: global UART device table definition.
-- `tests/test_serial_driver.cpp`: unit tests.
+- `tests/test_device_driver.cpp`: unit tests.
 
 ## Build requirements
 
@@ -57,7 +57,7 @@ Generated HTML docs are written to `build/docs/html/index.html`.
 
 ### Core serial driver API
 
-Defined in `include/serial_driver/serial_driver.h`:
+Defined in `include/device_driver/device_driver.h`:
 
 - `serial_driver_common_init(...)`
 - `serial_port_init(...)`
@@ -75,7 +75,7 @@ Status values:
 
 ### UART register/device API
 
-Defined in `include/serial_driver/registers.h`:
+Defined in `include/device_driver/registers.h`:
 
 - `uart16550_registers_t`: memory-mapped 16550-compatible register block
 - `uart_circular_buffer_t`: generic TX/RX circular buffer structure
@@ -96,7 +96,7 @@ Defined in `include/serial_driver/registers.h`:
 
 ```c
 #include <stdint.h>
-#include "serial_driver/serial_driver.h"
+#include "device_driver/device_driver.h"
 
 if (serial_driver_common_init() == SERIAL_DRIVER_OK) {
     serial_descriptor_t descriptor =

@@ -1,7 +1,7 @@
 #include <cstdint>
 
 extern "C" {
-#include "serial_driver/queue.h"
+#include "device_driver/queue.h"
 }
 
 #include <gtest/gtest.h>

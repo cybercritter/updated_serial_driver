@@ -1,4 +1,4 @@
-#include "serial_driver/queue.h"
+#include "device_driver/queue.h"
 
 static size_t queue_next_index(const serial_queue_t *queue, size_t current)
 {
