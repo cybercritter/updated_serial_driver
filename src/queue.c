@@ -1,13 +1,11 @@
 #include "device_driver/queue.h"
 
-static size_t queue_next_index(const serial_queue_t *queue, size_t current)
-{
+static size_t queue_next_index(const serial_queue_t *queue, size_t current) {
     (void)queue;
     return (current + 1U) % SERIAL_QUEUE_FIXED_SIZE_WORDS;
 }
 
-uart_error_t serial_queue_init(serial_queue_t *queue)
-{
+uart_error_t serial_queue_init(serial_queue_t *queue) {
     if (queue == NULL) {
         return UART_ERROR_INVALID_ARG;
     }
@@ -19,8 +17,7 @@ uart_error_t serial_queue_init(serial_queue_t *queue)
     return UART_ERROR_NONE;
 }
 
-uart_error_t serial_queue_push(serial_queue_t *queue, uint32_t value)
-{
+uart_error_t serial_queue_push(serial_queue_t *queue, uint32_t value) {
     size_t next_head = 0U;
 
     if (queue == NULL || !queue->initialized) {
@@ -28,7 +25,7 @@ uart_error_t serial_queue_push(serial_queue_t *queue, uint32_t value)
     }
 
     if (queue->count == SERIAL_QUEUE_FIXED_SIZE_WORDS) {
-        return UART_ERROR_FIFO_FULL;
+        return UART_ERROR_FIFO_QUEUE_FULL;
     }
 
     next_head = queue_next_index(queue, queue->head);
@@ -38,8 +35,7 @@ uart_error_t serial_queue_push(serial_queue_t *queue, uint32_t value)
     return UART_ERROR_NONE;
 }
 
-uart_error_t serial_queue_pop(serial_queue_t *queue, uint32_t *out_value)
-{
+uart_error_t serial_queue_pop(serial_queue_t *queue, uint32_t *out_value) {
     if (queue == NULL || out_value == NULL) {
         return UART_ERROR_INVALID_ARG;
     }
@@ -49,7 +45,7 @@ uart_error_t serial_queue_pop(serial_queue_t *queue, uint32_t *out_value)
     }
 
     if (queue->count == 0U) {
-        return UART_ERROR_FIFO_EMPTY;
+        return UART_ERROR_FIFO_QUEUE_EMPTY;
     }
 
     *out_value = queue->buffer[queue->tail];
@@ -58,8 +54,7 @@ uart_error_t serial_queue_pop(serial_queue_t *queue, uint32_t *out_value)
     return UART_ERROR_NONE;
 }
 
-size_t serial_queue_size(const serial_queue_t *queue)
-{
+size_t serial_queue_size(const serial_queue_t *queue) {
     if (queue == NULL || !queue->initialized) {
         return 0U;
     }
@@ -67,13 +62,11 @@ size_t serial_queue_size(const serial_queue_t *queue)
     return queue->count;
 }
 
-bool serial_queue_is_empty(const serial_queue_t *queue)
-{
+bool serial_queue_is_empty(const serial_queue_t *queue) {
     return serial_queue_size(queue) == 0U;
 }
 
-bool serial_queue_is_full(const serial_queue_t *queue)
-{
+bool serial_queue_is_full(const serial_queue_t *queue) {
     if (queue == NULL || !queue->initialized) {
         return false;
     }

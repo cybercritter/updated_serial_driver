@@ -24,33 +24,33 @@ typedef uint32_t serial_descriptor_t;
  * UART-level error handling.
  */
 typedef enum {
-  /** Operation completed successfully. */
-  SERIAL_DRIVER_OK = UART_ERROR_NONE,
-  /** One or more function arguments are invalid. */
-  SERIAL_DRIVER_ERROR_INVALID_ARG = UART_ERROR_INVALID_ARG,
-  /** Driver has not been initialized. */
-  SERIAL_DRIVER_ERROR_NOT_INITIALIZED = UART_ERROR_NOT_INITIALIZED,
-  /** UART was configured, but not in serial mode. */
-  SERIAL_DRIVER_ERROR_NOT_CONFIGURED = UART_ERROR_NOT_CONFIGURED,
-  /** TX queue has no free space for additional bytes. */
-  SERIAL_DRIVER_ERROR_TX_FULL = UART_ERROR_FIFO_FULL,
-  /** TX queue has no bytes available to read. */
-  SERIAL_DRIVER_ERROR_TX_EMPTY = UART_ERROR_FIFO_EMPTY,
-  /** RX queue has no free space for additional words. */
-  SERIAL_DRIVER_ERROR_RX_FULL = UART_ERROR_FIFO_FULL,
-  /** RX queue has no words available to read. */
-  SERIAL_DRIVER_ERROR_RX_EMPTY = UART_ERROR_FIFO_EMPTY
+    /** Operation completed successfully. */
+    SERIAL_DRIVER_OK = UART_ERROR_NONE,
+    /** One or more function arguments are invalid. */
+    SERIAL_DRIVER_ERROR_INVALID_ARG = UART_ERROR_INVALID_ARG,
+    /** Driver has not been initialized. */
+    SERIAL_DRIVER_ERROR_NOT_INITIALIZED = UART_ERROR_NOT_INITIALIZED,
+    /** UART was configured, but not in serial mode. */
+    SERIAL_DRIVER_ERROR_NOT_CONFIGURED = UART_ERROR_NOT_CONFIGURED,
+    /** TX queue has no free space for additional bytes. */
+    SERIAL_DRIVER_ERROR_TX_FULL = UART_ERROR_FIFO_QUEUE_FULL,
+    /** TX queue has no bytes available to read. */
+    SERIAL_DRIVER_ERROR_TX_EMPTY = UART_ERROR_FIFO_QUEUE_EMPTY,
+    /** RX queue has no free space for additional words. */
+    SERIAL_DRIVER_ERROR_RX_FULL = UART_ERROR_FIFO_QUEUE_FULL,
+    /** RX queue has no words available to read. */
+    SERIAL_DRIVER_ERROR_RX_EMPTY = UART_ERROR_FIFO_QUEUE_EMPTY
 } serial_driver_error_t;
 
 typedef enum SERIAL_PORTS {
-  SERIAL_PORT_0,
-  SERIAL_PORT_1,
-  SERIAL_PORT_2,
-  SERIAL_PORT_3,
-  SERIAL_PORT_4,
-  SERIAL_PORT_5,
-  SERIAL_PORT_6,
-  SERIAL_PORT_7,
+    SERIAL_PORT_0,
+    SERIAL_PORT_1,
+    SERIAL_PORT_2,
+    SERIAL_PORT_3,
+    SERIAL_PORT_4,
+    SERIAL_PORT_5,
+    SERIAL_PORT_6,
+    SERIAL_PORT_7,
 } serial_ports_t;
 /**
  * @brief Initialize common serial-driver state shared across UART ports.
@@ -105,8 +105,9 @@ serial_driver_error_t serial_driver_write_u32(serial_descriptor_t descriptor,
  * @param out_value Output pointer for the dequeued 32-bit value.
  * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
  */
-serial_driver_error_t serial_driver_read_next_tx_u32(
-    serial_descriptor_t descriptor, uint32_t *out_value);
+serial_driver_error_t
+serial_driver_read_next_tx_u32(serial_descriptor_t descriptor,
+                               uint32_t *out_value);
 
 /**
  * @brief Transmit queued data bytes into the device TX FIFO.
@@ -119,9 +120,10 @@ serial_driver_error_t serial_driver_read_next_tx_u32(
  * @param out_bytes_transmitted Output number of bytes actually transmitted.
  * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
  */
-serial_driver_error_t serial_driver_transmit_to_device_fifo(
-    serial_descriptor_t descriptor, size_t max_bytes,
-    size_t *out_bytes_transmitted);
+serial_driver_error_t
+serial_driver_transmit_to_device_fifo(serial_descriptor_t descriptor,
+                                      size_t max_bytes,
+                                      size_t *out_bytes_transmitted);
 
 /**
  * @brief Poll bytes from the device RX FIFO into the software RX queue.
@@ -134,9 +136,10 @@ serial_driver_error_t serial_driver_transmit_to_device_fifo(
  * @param out_bytes_received Output number of bytes actually consumed.
  * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
  */
-serial_driver_error_t serial_driver_receive_from_device_fifo(
-    serial_descriptor_t descriptor, size_t max_bytes,
-    size_t *out_bytes_received);
+serial_driver_error_t
+serial_driver_receive_from_device_fifo(serial_descriptor_t descriptor,
+                                       size_t max_bytes,
+                                       size_t *out_bytes_received);
 
 /**
  * @brief Poll one serial port: drain TX first, then service RX.
@@ -154,9 +157,11 @@ serial_driver_error_t serial_driver_receive_from_device_fifo(
  * @param out_rx_bytes_received Output number of RX bytes consumed.
  * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
  */
-serial_driver_error_t serial_driver_poll(
-    serial_descriptor_t descriptor, size_t max_tx_bytes, size_t max_rx_bytes,
-    size_t *out_tx_bytes_transmitted, size_t *out_rx_bytes_received);
+serial_driver_error_t serial_driver_poll(serial_descriptor_t descriptor,
+                                         size_t max_tx_bytes,
+                                         size_t max_rx_bytes,
+                                         size_t *out_tx_bytes_transmitted,
+                                         size_t *out_rx_bytes_received);
 
 /**
  * @brief Read received bytes into a user buffer.
