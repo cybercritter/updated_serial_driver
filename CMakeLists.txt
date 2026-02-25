@@ -31,6 +31,8 @@ endif()
 
 add_library(serial_driver
     src/serial_driver.c
+    src/serial_driver_tx.c
+    src/serial_driver_rx.c
     src/registers.c
     src/queue.c
 )

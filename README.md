@@ -6,7 +6,7 @@
 
 This repository provides:
 
-- A small, testable software TX queue (`serial_driver_t`) implemented as a circular buffer.
+- A testable serial-driver pipeline for staged TX/RX word and byte movement.
 - 16550 UART register and device data structures for memory-mapped UART instances.
 - A global UART device table (`uart_devices`) for multi-UART systems.
 - A unit test target using GoogleTest to validate core queue behavior.
@@ -14,8 +14,10 @@ This repository provides:
 ## Project layout
 
 - `CMakeLists.txt`: build configuration, library target, and test integration.
-- `include/serial_driver/serial_driver.h`: core TX queue API.
-- `src/serial_driver.c`: core TX queue implementation.
+- `include/serial_driver/serial_driver.h`: public serial driver API.
+- `src/serial_driver.c`: descriptor/state lifecycle and shared internals.
+- `src/serial_driver_tx.c`: TX path implementation.
+- `src/serial_driver_rx.c`: RX path and poll implementation.
 - `include/serial_driver/registers.h`: 16550 register map, UART/FIFO errors, and device descriptors.
 - `src/registers.c`: global UART device table definition.
 - `tests/test_serial_driver.cpp`: unit tests.
@@ -24,7 +26,7 @@ This repository provides:
 
 - CMake 3.21+
 - C11 compiler
-- C++17 compiler (tests only)
+- C++11 compiler (tests only)
 - Network access during first configure to fetch GoogleTest
 
 ## Build
@@ -53,21 +55,23 @@ Generated HTML docs are written to `build/docs/html/index.html`.
 
 ## Public APIs
 
-### Core serial queue API
+### Core serial driver API
 
 Defined in `include/serial_driver/serial_driver.h`:
 
-- `serial_driver_init(...)`
-- `serial_driver_write_byte(...)`
-- `serial_driver_read_next_tx(...)`
+- `serial_driver_common_init(...)`
+- `serial_port_init(...)`
+- `serial_driver_write(...)`
+- `serial_driver_read(...)`
+- `serial_driver_poll(...)`
 - `serial_driver_pending_tx(...)`
 
 Status values:
 
 - `SERIAL_DRIVER_OK`
-- `SERIAL_DRIVER_INVALID_ARG`
-- `SERIAL_DRIVER_BUFFER_FULL`
-- `SERIAL_DRIVER_BUFFER_EMPTY`
+- `SERIAL_DRIVER_ERROR_INVALID_ARG`
+- `SERIAL_DRIVER_ERROR_TX_FULL`
+- `SERIAL_DRIVER_ERROR_RX_EMPTY`
 
 ### UART register/device API
 
@@ -81,7 +85,7 @@ Defined in `include/serial_driver/registers.h`:
 
 ## Design notes
 
-- The core queue keeps one slot empty to distinguish full from empty states.
+- The internal word queue uses count-based full/empty tracking.
 - Register offset aliases are modeled with unions:
   - Offset `0x00`: `RBR/THR/DLL`
   - Offset `0x01`: `IER/DLM`
@@ -94,11 +98,12 @@ Defined in `include/serial_driver/registers.h`:
 #include <stdint.h>
 #include "serial_driver/serial_driver.h"
 
-serial_driver_t driver;
-uint8_t tx_buffer[64];
-
-if (serial_driver_init(&driver, tx_buffer, sizeof(tx_buffer)) == SERIAL_DRIVER_OK) {
-    (void)serial_driver_write_byte(&driver, 0x55U);
+if (serial_driver_common_init() == SERIAL_DRIVER_OK) {
+    serial_descriptor_t descriptor =
+        serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
+    uint8_t data[1] = {0x55U};
+    size_t bytes_written = 0U;
+    (void)serial_driver_write(descriptor, data, sizeof(data), &bytes_written);
 }
 ```
 
