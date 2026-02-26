@@ -1,5 +1,30 @@
 #include "device_driver/device_driver_internal.h"
 
+static serial_driver_error_t
+serial_driver_flush_rx_staged_word(serial_descriptor_entry_t *entry,
+                                   bool *out_queue_full)
+{
+    uart_error_t queue_error = UART_ERROR_NONE;
+
+    *out_queue_full = false;
+
+    queue_error =
+        serial_queue_push(&entry->uart_device->rx_queue, entry->rx_staged_word);
+    if (queue_error == UART_ERROR_NONE)
+    {
+        entry->rx_staged_word = 0U;
+        entry->rx_staged_word_bytes = 0U;
+        return SERIAL_DRIVER_OK;
+    }
+    if (queue_error == UART_ERROR_FIFO_QUEUE_FULL)
+    {
+        *out_queue_full = true;
+        return SERIAL_DRIVER_OK;
+    }
+
+    return SERIAL_DRIVER_ERROR_NOT_INITIALIZED;
+}
+
 serial_driver_error_t
 serial_driver_receive_from_device_fifo(serial_descriptor_t descriptor,
                                        size_t max_bytes,
@@ -7,9 +32,10 @@ serial_driver_receive_from_device_fifo(serial_descriptor_t descriptor,
 {
     serial_descriptor_entry_t *entry = NULL;
     uart_byte_fifo_t *fifo = NULL;
-    uart_error_t queue_error = UART_ERROR_NONE;
     size_t bytes_received = 0U;
     uint8_t byte = 0U;
+    bool queue_full = false;
+    serial_driver_error_t status = SERIAL_DRIVER_OK;
 
     if (out_bytes_received == NULL)
     {
@@ -39,19 +65,16 @@ serial_driver_receive_from_device_fifo(serial_descriptor_t descriptor,
     {
         if (entry->rx_staged_word_bytes == sizeof(uint32_t))
         {
-            queue_error = serial_queue_push(&entry->uart_device->rx_queue,
-                                            entry->rx_staged_word);
-            if (queue_error == UART_ERROR_FIFO_QUEUE_FULL)
+            status = serial_driver_flush_rx_staged_word(entry, &queue_full);
+            if (status != SERIAL_DRIVER_OK)
+            {
+                *out_bytes_received = bytes_received;
+                return status;
+            }
+            if (queue_full)
             {
                 break;
             }
-            if (queue_error != UART_ERROR_NONE)
-            {
-                return SERIAL_DRIVER_ERROR_NOT_INITIALIZED;
-            }
-
-            entry->rx_staged_word = 0U;
-            entry->rx_staged_word_bytes = 0U;
             continue;
         }
 
@@ -69,16 +92,11 @@ serial_driver_receive_from_device_fifo(serial_descriptor_t descriptor,
 
     if (entry->rx_staged_word_bytes == sizeof(uint32_t))
     {
-        queue_error = serial_queue_push(&entry->uart_device->rx_queue,
-                                        entry->rx_staged_word);
-        if (queue_error == UART_ERROR_NONE)
+        status = serial_driver_flush_rx_staged_word(entry, &queue_full);
+        if (status != SERIAL_DRIVER_OK)
         {
-            entry->rx_staged_word = 0U;
-            entry->rx_staged_word_bytes = 0U;
-        }
-        else if (queue_error != UART_ERROR_FIFO_QUEUE_FULL)
-        {
-            return SERIAL_DRIVER_ERROR_NOT_INITIALIZED;
+            *out_bytes_received = bytes_received;
+            return status;
         }
     }
 
