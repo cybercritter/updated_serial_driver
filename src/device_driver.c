@@ -29,7 +29,24 @@ serial_driver_get_entry(serial_descriptor_t descriptor)
 
 size_t serial_driver_descriptor_index(serial_descriptor_t descriptor)
 {
-    return (size_t)(descriptor - 1U);
+    if (descriptor == SERIAL_DESCRIPTOR_INVALID)
+    {
+        return UART_DEVICE_COUNT;
+    }
+
+    serial_descriptor_entry_t *entry = serial_driver_get_entry(descriptor);
+    if (entry == NULL)
+    {
+        return UART_DEVICE_COUNT;
+    }
+
+    uint32_t port_index = entry->port_index;
+    if (port_index < UART_DEVICE_COUNT)
+    {
+        return (size_t)port_index;
+    }
+
+    return -1U;
 }
 
 void serial_driver_byte_fifo_reset(uart_byte_fifo_t *fifo)

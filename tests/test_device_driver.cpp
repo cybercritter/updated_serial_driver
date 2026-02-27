@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <string>
 
 extern "C"
@@ -141,6 +142,38 @@ TEST(SerialDriverTest, PortInitFailsWhenHardwareMapperFails)
               SERIAL_DESCRIPTOR_INVALID);
 
     serial_driver_hw_reset_mapper();
+}
+
+TEST(SerialDriverTest, HardwareMapperRejectsNullRegistration)
+{
+    EXPECT_EQ(serial_driver_hw_set_mapper(nullptr, nullptr),
+              UART_ERROR_INVALID_ARG);
+}
+
+TEST(SerialDriverTest, DefaultHardwareMapperUsesBaseAddressWhenProvided)
+{
+    serial_descriptor_t descriptor = SERIAL_DESCRIPTOR_INVALID;
+    uart_device_t *uart_device = nullptr;
+    uart16550_registers_t mock_registers[UART_DEVICE_COUNT];
+
+    std::memset(mock_registers, 0, sizeof(mock_registers));
+    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
+    serial_driver_hw_reset_mapper();
+
+    uart_devices[SERIAL_PORT_4].uart_base_address =
+        reinterpret_cast<uintptr_t>(&mock_registers[SERIAL_PORT_4]);
+    uart_devices[SERIAL_PORT_4].registers = nullptr;
+    uart_devices[SERIAL_PORT_4].device_name = nullptr;
+
+    descriptor = serial_port_init(SERIAL_PORT_4, UART_PORT_MODE_SERIAL);
+    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
+
+    uart_device = serial_driver_get_uart_device(descriptor);
+    ASSERT_NE(uart_device, nullptr);
+    EXPECT_EQ(uart_device->registers, &mock_registers[SERIAL_PORT_4]);
+    EXPECT_EQ(uart_device->uart_base_address,
+              reinterpret_cast<uintptr_t>(&mock_registers[SERIAL_PORT_4]));
+    ASSERT_NE(uart_device->device_name, nullptr);
 }
 
 TEST(SerialDriverTest, InvalidDescriptorPathsAfterCommonInitAreReported)
