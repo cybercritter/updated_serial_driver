@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "hw_abstraction.h"
 #include "registers.h"
 
 /** Opaque serial-driver descriptor returned by @ref serial_port_init. */
@@ -23,7 +24,8 @@ typedef uint32_t serial_descriptor_t;
  * Values are aligned with @ref uart_error_t for compatibility with existing
  * UART-level error handling.
  */
-typedef enum {
+typedef enum
+{
     /** Operation completed successfully. */
     SERIAL_DRIVER_OK = UART_ERROR_NONE,
     /** One or more function arguments are invalid. */
@@ -39,10 +41,13 @@ typedef enum {
     /** RX queue has no free space for additional words. */
     SERIAL_DRIVER_ERROR_RX_FULL = UART_ERROR_FIFO_QUEUE_FULL,
     /** RX queue has no words available to read. */
-    SERIAL_DRIVER_ERROR_RX_EMPTY = UART_ERROR_FIFO_QUEUE_EMPTY
+    SERIAL_DRIVER_ERROR_RX_EMPTY = UART_ERROR_FIFO_QUEUE_EMPTY,
+    /** Invalid serial port. */
+    SERIAL_DRIVER_ERROR_INVALID_PORT = UART_ERROR_INVALID_ARG,
 } serial_driver_error_t;
 
-typedef enum SERIAL_PORTS {
+typedef enum SERIAL_PORTS
+{
     SERIAL_PORT_0,
     SERIAL_PORT_1,
     SERIAL_PORT_2,

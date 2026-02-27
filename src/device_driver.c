@@ -107,6 +107,7 @@ serial_descriptor_t serial_port_init(serial_ports_t port, uart_port_mode_t mode)
 {
     size_t index = 0U;
     uart_device_t *uart_device = NULL;
+    uart_error_t hw_map_error = UART_ERROR_NONE;
 
     if (!serial_driver_common_initialized)
     {
@@ -117,6 +118,12 @@ serial_descriptor_t serial_port_init(serial_ports_t port, uart_port_mode_t mode)
     {
         return SERIAL_DESCRIPTOR_INVALID;
     }
+
+    if (port < SERIAL_PORT_0 || port >= UART_DEVICE_COUNT)
+    {
+        return SERIAL_DRIVER_ERROR_INVALID_PORT;
+    }
+
     uart_device = &uart_devices[(size_t)port];
 
     if (mode != UART_PORT_MODE_SERIAL && mode != UART_PORT_MODE_DISCRETE)
@@ -131,6 +138,12 @@ serial_descriptor_t serial_port_init(serial_ports_t port, uart_port_mode_t mode)
         {
             return (serial_descriptor_t)(index + 1U);
         }
+    }
+
+    hw_map_error = serial_driver_hw_map_uart((size_t)port, uart_device);
+    if (hw_map_error != UART_ERROR_NONE || uart_device->registers == NULL)
+    {
+        return SERIAL_DESCRIPTOR_INVALID;
     }
 
     for (index = 0U; index < UART_DEVICE_COUNT; ++index)

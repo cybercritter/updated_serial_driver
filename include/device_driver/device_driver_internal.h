@@ -34,5 +34,7 @@ bool serial_driver_byte_fifo_is_empty(const uart_byte_fifo_t *fifo);
 uint8_t serial_driver_byte_fifo_pop(uart_byte_fifo_t *fifo);
 
 size_t serial_driver_available_rx_bytes(const serial_descriptor_entry_t *entry);
+uart_error_t serial_driver_hw_map_uart(size_t port_index,
+                                       uart_device_t *uart_device);
 
 #endif

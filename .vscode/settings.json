@@ -1,8 +1,4 @@
 {
-  "sonarlint.connectedMode.project": {
-    "connectionId": "cybercritter",
-    "projectKey": "cybercritter_updated_serial_driver"
-  },
   "sonarlint.pathToCompileCommands": "${workspaceFolder}/compile_commands.json",
   "editor.tokenColorCustomizations": {
     "textMateRules": [
@@ -26,12 +22,11 @@
       }
     ]
   },
-  "cSpell.words": [
-    "CPACK",
-    "CTEST",
-    "Doxyfile",
-    "gcda",
-    "gcov",
-    "GCOVR"
-  ]
+  "cSpell.words": ["CPACK", "CTEST", "Doxyfile", "gcda", "gcov", "GCOVR"],
+  "sonarlint.connectedMode.project": {
+    "connectionId": "cybercritter",
+    "projectKey": "cybercritter_updated_serial_driver"
+  },
+  "cSpell.words": ["CPACK", "CTEST", "Doxyfile", "gcda", "gcov", "GCOVR"],
+  "gtest-adapter.debugConfig": ["(gdb) Launch"]
 }

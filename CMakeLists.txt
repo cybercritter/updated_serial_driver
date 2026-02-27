@@ -33,6 +33,7 @@ add_library(device_driver
     src/device_driver.c
     src/device_driver_tx.c
     src/device_driver_rx.c
+    src/hw_abstraction.c
     src/registers.c
     src/queue.c
 )

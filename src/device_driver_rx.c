@@ -10,6 +10,7 @@ serial_driver_flush_rx_staged_word(serial_descriptor_entry_t *entry,
 
     queue_error =
         serial_queue_push(&entry->uart_device->rx_queue, entry->rx_staged_word);
+
     if (queue_error == UART_ERROR_NONE)
     {
         entry->rx_staged_word = 0U;

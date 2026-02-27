@@ -12,23 +12,40 @@
 #define UART_MCR_LOOPBACK_ENABLE_BIT (1U << 4U)
 
 static bool g_loopback_enabled = false;
+static uart16550_registers_t g_mock_registers[UART_DEVICE_COUNT];
 
 static void loopback_enable(void) { g_loopback_enabled = true; }
 
 static void loopback_disable(void) { g_loopback_enabled = false; }
 
-static int configure_mock_uart_registers(void) {
-  static uart16550_registers_t mock_registers[UART_DEVICE_COUNT];
-  size_t i = 0U;
+static uart_error_t map_mock_uart_registers(size_t port_index,
+                                            uart_device_t *uart_device,
+                                            void *context) {
+  uart16550_registers_t *register_blocks =
+      (uart16550_registers_t *)context;
 
-  for (i = 0U; i < UART_DEVICE_COUNT; ++i) {
-    memset(&mock_registers[i], 0, sizeof(mock_registers[i]));
-    uart_devices[i].registers = &mock_registers[i];
-    uart_devices[i].device_name = "mock-uart";
-    uart_devices[i].uart_base_address = (uintptr_t)&mock_registers[i];
+  if (uart_device == NULL || register_blocks == NULL ||
+      port_index >= UART_DEVICE_COUNT) {
+    return UART_ERROR_INVALID_ARG;
   }
 
-  return 0;
+  uart_device->registers = &register_blocks[port_index];
+  uart_device->device_name = "mock-uart";
+  uart_device->uart_base_address = (uintptr_t)&register_blocks[port_index];
+
+  return UART_ERROR_NONE;
+}
+
+static int configure_mock_uart_registers(void) {
+  size_t i = 0U;
+  for (i = 0U; i < UART_DEVICE_COUNT; ++i) {
+    memset(&g_mock_registers[i], 0, sizeof(g_mock_registers[i]));
+  }
+
+  return serial_driver_hw_set_mapper(map_mock_uart_registers,
+                                     g_mock_registers) == UART_ERROR_NONE
+             ? 0
+             : 1;
 }
 
 static int run_port6_serial_roundtrip(void) {
