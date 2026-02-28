@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-static uart16550_registers_t default_register_blocks[UART_DEVICE_COUNT] = {0};
+static xr17c358_channel_register_map_t default_register_blocks[UART_DEVICE_COUNT] = {0};
 static const char *const default_device_names[UART_DEVICE_COUNT] = {
     "uart0", "uart1", "uart2", "uart3",
     "uart4", "uart5", "uart6", "uart7"};
@@ -24,7 +24,7 @@ static uart_error_t serial_driver_default_hw_map(size_t port_index,
         if (uart_device->uart_base_address != (uintptr_t)0U)
         {
             uart_device->registers =
-                (uart16550_registers_t *)uart_device->uart_base_address;
+                (xr17c358_channel_register_map_t *)uart_device->uart_base_address;
         }
         else
         {
@@ -49,11 +49,6 @@ static void *serial_driver_hw_mapper_context = NULL;
 uart_error_t serial_driver_hw_map_uart(size_t port_index,
                                        uart_device_t *uart_device)
 {
-    if (serial_driver_hw_mapper == NULL)
-    {
-        return UART_ERROR_NOT_INITIALIZED;
-    }
-
     return serial_driver_hw_mapper(port_index, uart_device,
                                    serial_driver_hw_mapper_context);
 }

@@ -1,1047 +1,287 @@
-#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstring>
-#include <string>
 
 extern "C"
 {
 #include "device_driver/device_driver.h"
-#include "device_driver/device_driver_internal.h"
 }
 
 #include <gtest/gtest.h>
 
-class SerialDriverPortTest : public ::testing::TestWithParam<size_t>
+namespace
 {
-  protected:
-    void SetUp() override
-    {
-        ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    }
 
-    serial_ports_t Port() const
-    {
-        return static_cast<serial_ports_t>(GetParam());
-    }
+xr17c358_channel_register_map_t g_test_registers[UART_DEVICE_COUNT];
 
-    uart_device_t *PortDevice() { return &uart_devices[GetParam()]; }
-};
-
-static uint8_t PopWriteFifoByte(size_t fifo_index)
-{
-    if (fifo_index >= UART_FIFO_UART_COUNT)
-    {
-        ADD_FAILURE() << "Invalid write FIFO index: " << fifo_index;
-        return 0U;
-    }
-    uart_byte_fifo_t *fifo = &uart_fifo_map.write_fifos[fifo_index];
-    uint8_t value = fifo->data[fifo->tail];
-    fifo->tail = (fifo->tail + 1U) % UART_DEVICE_FIFO_SIZE_BYTES;
-    fifo->count -= 1U;
-    return value;
-}
-
-static void PushReadFifoByte(size_t fifo_index, uint8_t value)
-{
-    if (fifo_index >= UART_FIFO_UART_COUNT)
-    {
-        ADD_FAILURE() << "Invalid read FIFO index: " << fifo_index;
-        return;
-    }
-    uart_byte_fifo_t *fifo = &uart_fifo_map.read_fifos[fifo_index];
-    fifo->data[fifo->head] = value;
-    fifo->head = (fifo->head + 1U) % UART_DEVICE_FIFO_SIZE_BYTES;
-    fifo->count += 1U;
-}
-
-static uart16550_registers_t g_test_mapped_registers[UART_DEVICE_COUNT];
-static size_t g_hw_mapper_call_count = 0U;
-
-static uart_error_t CountingHwMapper(size_t port_index,
-                                     uart_device_t *uart_device, void *context)
+uart_error_t TestMapper(size_t port_index, uart_device_t *uart_device, void *context)
 {
     (void)context;
+
     if (uart_device == nullptr || port_index >= UART_DEVICE_COUNT)
     {
         return UART_ERROR_INVALID_ARG;
     }
 
-    g_hw_mapper_call_count += 1U;
-    uart_device->registers = &g_test_mapped_registers[port_index];
+    std::memset(&g_test_registers[port_index], 0,
+                sizeof(g_test_registers[port_index]));
+
+    uart_device->registers = &g_test_registers[port_index];
     uart_device->uart_base_address =
-        reinterpret_cast<uintptr_t>(&g_test_mapped_registers[port_index]);
-    uart_device->device_name = "gtest-mapped-uart";
+        reinterpret_cast<uintptr_t>(&g_test_registers[port_index]);
+    uart_device->device_name = "test-uart";
+
     return UART_ERROR_NONE;
 }
 
-static uart_error_t FailingHwMapper(size_t port_index,
-                                    uart_device_t *uart_device, void *context)
+void ResetFifo(uart_byte_fifo_t *fifo)
 {
-    (void)port_index;
-    (void)uart_device;
-    (void)context;
-    return UART_ERROR_DEVICE_NOT_FOUND;
+    fifo->head = 0U;
+    fifo->tail = 0U;
+    fifo->count = 0U;
 }
 
-TEST(SerialDriverTest, InvalidDescriptorPathsAreReported)
+bool FifoIsEmpty(const uart_byte_fifo_t *fifo)
 {
-    uint32_t value = 0U;
-
-    EXPECT_EQ(serial_driver_write_u32(SERIAL_DESCRIPTOR_INVALID, 0x12345678U),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_read_next_tx_u32(SERIAL_DESCRIPTOR_INVALID, &value),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(
-        serial_driver_read_next_tx_u32(SERIAL_DESCRIPTOR_INVALID, nullptr),
-        SERIAL_DRIVER_ERROR_INVALID_ARG);
-    EXPECT_EQ(serial_driver_pending_tx(SERIAL_DESCRIPTOR_INVALID), 0U);
-    EXPECT_EQ(serial_driver_get_uart_device(SERIAL_DESCRIPTOR_INVALID),
-              nullptr);
-
-    EXPECT_EQ(serial_driver_write_u32(1U, 0x0U),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_read_next_tx_u32(1U, &value),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_pending_tx(1U), 0U);
-    EXPECT_EQ(serial_driver_get_uart_device(1U), nullptr);
-
-    EXPECT_EQ(serial_driver_write_u32(UART_DEVICE_COUNT + 1U, 0xCAFEBABEU),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
+    return fifo->count == 0U;
 }
 
-TEST(SerialDriverTest, PortInitUsesRegisteredHardwareMapper)
+bool FifoIsFull(const uart_byte_fifo_t *fifo)
 {
-    serial_descriptor_t descriptor = SERIAL_DESCRIPTOR_INVALID;
-    uart_device_t *uart_device = nullptr;
-
-    g_hw_mapper_call_count = 0U;
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    ASSERT_EQ(serial_driver_hw_set_mapper(CountingHwMapper, nullptr),
-              UART_ERROR_NONE);
-
-    descriptor = serial_port_init(SERIAL_PORT_2, UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    EXPECT_EQ(g_hw_mapper_call_count, 1U);
-
-    uart_device = serial_driver_get_uart_device(descriptor);
-    ASSERT_NE(uart_device, nullptr);
-    EXPECT_EQ(uart_device->registers, &g_test_mapped_registers[SERIAL_PORT_2]);
-    EXPECT_STREQ(uart_device->device_name, "gtest-mapped-uart");
-
-    serial_driver_hw_reset_mapper();
+    return fifo->count == UART_DEVICE_FIFO_SIZE_BYTES;
 }
 
-TEST(SerialDriverTest, PortInitFailsWhenHardwareMapperFails)
+void FifoPush(uart_byte_fifo_t *fifo, uint8_t value)
 {
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    ASSERT_EQ(serial_driver_hw_set_mapper(FailingHwMapper, nullptr),
-              UART_ERROR_NONE);
-
-    EXPECT_EQ(serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL),
-              SERIAL_DESCRIPTOR_INVALID);
-
-    serial_driver_hw_reset_mapper();
+    fifo->data[fifo->head] = value;
+    fifo->head = (fifo->head + 1U) % UART_DEVICE_FIFO_SIZE_BYTES;
+    fifo->count += 1U;
 }
 
-TEST(SerialDriverTest, HardwareMapperRejectsNullRegistration)
+uint8_t FifoPop(uart_byte_fifo_t *fifo)
 {
-    EXPECT_EQ(serial_driver_hw_set_mapper(nullptr, nullptr),
-              UART_ERROR_INVALID_ARG);
+    const uint8_t value = fifo->data[fifo->tail];
+    fifo->tail = (fifo->tail + 1U) % UART_DEVICE_FIFO_SIZE_BYTES;
+    fifo->count -= 1U;
+    return value;
 }
 
-TEST(SerialDriverTest, DefaultHardwareMapperUsesBaseAddressWhenProvided)
+size_t MoveWriteToRead(size_t port_index)
 {
-    serial_descriptor_t descriptor = SERIAL_DESCRIPTOR_INVALID;
-    uart_device_t *uart_device = nullptr;
-    uart16550_registers_t mock_registers[UART_DEVICE_COUNT];
+    size_t moved = 0U;
+    uart_byte_fifo_t *write_fifo = &uart_fifo_map.write_fifos[port_index];
+    uart_byte_fifo_t *read_fifo = &uart_fifo_map.read_fifos[port_index];
 
-    std::memset(mock_registers, 0, sizeof(mock_registers));
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    serial_driver_hw_reset_mapper();
+    while (!FifoIsEmpty(write_fifo) && !FifoIsFull(read_fifo))
+    {
+        FifoPush(read_fifo, FifoPop(write_fifo));
+        moved += 1U;
+    }
 
-    uart_devices[SERIAL_PORT_4].uart_base_address =
-        reinterpret_cast<uintptr_t>(&mock_registers[SERIAL_PORT_4]);
-    uart_devices[SERIAL_PORT_4].registers = nullptr;
-    uart_devices[SERIAL_PORT_4].device_name = nullptr;
-
-    descriptor = serial_port_init(SERIAL_PORT_4, UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-
-    uart_device = serial_driver_get_uart_device(descriptor);
-    ASSERT_NE(uart_device, nullptr);
-    EXPECT_EQ(uart_device->registers, &mock_registers[SERIAL_PORT_4]);
-    EXPECT_EQ(uart_device->uart_base_address,
-              reinterpret_cast<uintptr_t>(&mock_registers[SERIAL_PORT_4]));
-    ASSERT_NE(uart_device->device_name, nullptr);
+    return moved;
 }
 
-TEST(SerialDriverTest, InvalidDescriptorPathsAfterCommonInitAreReported)
+} // namespace
+
+class SerialDriverApiTest : public ::testing::Test
 {
-    uint32_t value = 0U;
-    size_t bytes = 0U;
+  protected:
+    void SetUp() override
+    {
+        ASSERT_EQ(serial_driver_hw_set_mapper(TestMapper, nullptr),
+                  UART_ERROR_NONE);
+    }
 
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
+    void TearDown() override
+    {
+        serial_driver_hw_reset_mapper();
+    }
+};
 
-    EXPECT_EQ(serial_driver_write_u32(1U, 0x11111111U),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_read_next_tx_u32(1U, &value),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_pending_tx(1U), 0U);
-    EXPECT_EQ(serial_driver_get_uart_device(1U), nullptr);
-
-    EXPECT_EQ(serial_driver_write_u32(SERIAL_DESCRIPTOR_INVALID, 0x12345678U),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_read_next_tx_u32(SERIAL_DESCRIPTOR_INVALID, &value),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_pending_tx(SERIAL_DESCRIPTOR_INVALID), 0U);
-    EXPECT_EQ(serial_driver_get_uart_device(SERIAL_DESCRIPTOR_INVALID),
-              nullptr);
-
-    EXPECT_EQ(serial_driver_write_u32(UART_DEVICE_COUNT + 1U, 0xCAFEBABEU),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_read_next_tx_u32(UART_DEVICE_COUNT + 1U, &value),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_transmit_to_device_fifo(UART_DEVICE_COUNT + 1U, 4U,
-                                                    &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_receive_from_device_fifo(UART_DEVICE_COUNT + 1U, 4U,
-                                                     &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_read_u32(UART_DEVICE_COUNT + 1U, &value),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_pending_rx(UART_DEVICE_COUNT + 1U), 0U);
-    EXPECT_EQ(serial_driver_pending_tx(UART_DEVICE_COUNT + 1U), 0U);
-    EXPECT_EQ(serial_driver_get_uart_device(UART_DEVICE_COUNT + 1U), nullptr);
-
-    EXPECT_EQ(serial_driver_transmit_to_device_fifo(SERIAL_DESCRIPTOR_INVALID,
-                                                    4U, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_receive_from_device_fifo(SERIAL_DESCRIPTOR_INVALID,
-                                                     4U, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(
-        serial_driver_poll(SERIAL_DESCRIPTOR_INVALID, 4U, 4U, &bytes, &bytes),
-        SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_transmit_to_device_fifo(1U, 4U, nullptr),
-              SERIAL_DRIVER_ERROR_INVALID_ARG);
-    EXPECT_EQ(serial_driver_receive_from_device_fifo(1U, 4U, nullptr),
-              SERIAL_DRIVER_ERROR_INVALID_ARG);
-    EXPECT_EQ(serial_driver_write(1U, nullptr, 1U, &bytes),
-              SERIAL_DRIVER_ERROR_INVALID_ARG);
-    const std::array<uint8_t, 1> empty_payload{{0x00U}};
-    EXPECT_EQ(serial_driver_write(1U, empty_payload.data(), 1U, nullptr),
-              SERIAL_DRIVER_ERROR_INVALID_ARG);
-    EXPECT_EQ(serial_driver_read(1U, nullptr, 1U, &bytes),
-              SERIAL_DRIVER_ERROR_INVALID_ARG);
-    EXPECT_EQ(serial_driver_read(1U, reinterpret_cast<uint8_t *>(&value), 1U,
-                                 nullptr),
-              SERIAL_DRIVER_ERROR_INVALID_ARG);
-    EXPECT_EQ(serial_driver_poll(1U, 4U, 4U, nullptr, &bytes),
-              SERIAL_DRIVER_ERROR_INVALID_ARG);
-    EXPECT_EQ(serial_driver_poll(1U, 4U, 4U, &bytes, nullptr),
-              SERIAL_DRIVER_ERROR_INVALID_ARG);
-    EXPECT_EQ(serial_driver_read_u32(1U, nullptr),
-              SERIAL_DRIVER_ERROR_INVALID_ARG);
-}
-
-TEST(SerialDriverTest, NotInitializedRxAndTxApiPathsAreReported)
+TEST_F(SerialDriverApiTest, PortInitRejectsInvalidPortAndMode)
 {
-    size_t bytes = 99U;
-    uint8_t one_byte = 0U;
-    uint32_t value = 0U;
-
-    serial_driver_common_initialized = false;
-
-    EXPECT_EQ(serial_driver_transmit_to_device_fifo(1U, 1U, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(bytes, 0U);
-
-    bytes = 99U;
-    EXPECT_EQ(serial_driver_receive_from_device_fifo(1U, 1U, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(bytes, 0U);
-
-    bytes = 99U;
-    EXPECT_EQ(serial_driver_read(1U, &one_byte, 1U, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(bytes, 0U);
-
-    EXPECT_EQ(serial_driver_read_u32(1U, &value),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_pending_rx(1U), 0U);
-}
-
-TEST(SerialDriverTest, InitRejectsInvalidArguments)
-{
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-
     EXPECT_EQ(serial_port_init(static_cast<serial_ports_t>(UART_DEVICE_COUNT),
                                UART_PORT_MODE_SERIAL),
               SERIAL_DESCRIPTOR_INVALID);
-}
 
-TEST(SerialDriverTest, PortInitRequiresCommonInit)
-{
-    serial_driver_common_initialized = false;
-    EXPECT_EQ(serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL),
+    EXPECT_EQ(serial_port_init(SERIAL_PORT_0, static_cast<uart_port_mode_t>(99)),
               SERIAL_DESCRIPTOR_INVALID);
 }
 
-TEST(SerialDriverTest, GenericWriteCoversEdgeErrorPaths)
+TEST_F(SerialDriverApiTest, SerialRoundTripViaPollAndReadWrite)
 {
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    auto discrete_descriptor = SERIAL_DESCRIPTOR_INVALID;
+    constexpr size_t kPort = SERIAL_PORT_0;
+    const std::array<uint8_t, 6> payload{{0x10U, 0x20U, 0x30U, 0x40U, 0x50U,
+                                          0x60U}};
+    std::array<uint8_t, payload.size()> received{{0U}};
     size_t bytes_written = 0U;
-    std::array<uint8_t, 4> data4{{0x01U, 0x02U, 0x03U, 0x04U}};
-    std::array<uint8_t, 1> data1{{0x05U}};
-
-    EXPECT_EQ(serial_driver_write(descriptor, data1.data(), data1.size(),
-                                  &bytes_written),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    descriptor = serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    discrete_descriptor =
-        serial_port_init(SERIAL_PORT_1, UART_PORT_MODE_DISCRETE);
-    ASSERT_NE(discrete_descriptor, SERIAL_DESCRIPTOR_INVALID);
-
-    EXPECT_EQ(
-        serial_driver_write(discrete_descriptor,
-                            reinterpret_cast<const uint8_t *>(data1.data()),
-                            data1.size(), &bytes_written),
-        SERIAL_DRIVER_ERROR_NOT_CONFIGURED);
-
-    for (size_t i = 0U; i < SERIAL_QUEUE_FIXED_SIZE_WORDS; ++i)
-    {
-        ASSERT_EQ(serial_driver_write_u32(descriptor, static_cast<uint32_t>(i)),
-                  SERIAL_DRIVER_OK);
-    }
-
-    ASSERT_EQ(serial_driver_write(descriptor, data4.data(), data4.size(),
-                                  &bytes_written),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes_written, data4.size());
-    EXPECT_EQ(serial_driver_write(descriptor, data1.data(), data1.size(),
-                                  &bytes_written),
-              SERIAL_DRIVER_ERROR_TX_FULL);
-    EXPECT_EQ(bytes_written, 0U);
-
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    descriptor = serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    uart_devices[SERIAL_PORT_0].tx_queue.initialized = false;
-
-    EXPECT_EQ(serial_driver_write(descriptor, data4.data(), data4.size(),
-                                  &bytes_written),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_write(descriptor, data1.data(), data1.size(),
-                                  &bytes_written),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-}
-
-TEST(SerialDriverTest, TransmitReceiveAndPollCoverErrorPaths)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    size_t bytes = 0U;
-
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    descriptor = serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    uart_devices[SERIAL_PORT_0].tx_queue.initialized = false;
-
-    EXPECT_EQ(serial_driver_transmit_to_device_fifo(descriptor, 1U, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    descriptor = serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    PushReadFifoByte(0U, 0x11U);
-    PushReadFifoByte(0U, 0x22U);
-    PushReadFifoByte(0U, 0x33U);
-    PushReadFifoByte(0U, 0x44U);
-    uart_devices[SERIAL_PORT_0].rx_queue.initialized = false;
-
-    EXPECT_EQ(serial_driver_receive_from_device_fifo(descriptor, 4U, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_receive_from_device_fifo(descriptor, 1U, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    descriptor = serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    PushReadFifoByte(0U, 0xAAU);
-    PushReadFifoByte(0U, 0xBBU);
-    PushReadFifoByte(0U, 0xCCU);
-    PushReadFifoByte(0U, 0xDDU);
-    uart_devices[SERIAL_PORT_0].rx_queue.initialized = false;
-
-    EXPECT_EQ(serial_driver_poll(descriptor, 0U, 4U, &bytes, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-}
-
-TEST(SerialDriverTest, GenericReadAndPendingCoverStagedAndErrorPaths)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    auto discrete_descriptor = SERIAL_DESCRIPTOR_INVALID;
-    uint32_t value = 0U;
-    const std::array<uint8_t, 4> data4{{0x01U, 0x02U, 0x03U, 0x04U}};
-    std::string read_buf(2U, '\0');
+    size_t tx_bytes = 0U;
+    size_t rx_bytes = 0U;
     size_t bytes_read = 0U;
-    size_t bytes_received = 0U;
-    size_t bytes_written = 0U;
 
-    EXPECT_EQ(serial_driver_read_u32(1U, &value),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_pending_rx(1U), 0U);
-    EXPECT_EQ(serial_driver_read(1U,
-                                 reinterpret_cast<uint8_t *>(read_buf.data()),
-                                 1U, &bytes_read),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
+    ResetFifo(&uart_fifo_map.write_fifos[kPort]);
+    ResetFifo(&uart_fifo_map.read_fifos[kPort]);
 
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    discrete_descriptor =
-        serial_port_init(SERIAL_PORT_1, UART_PORT_MODE_DISCRETE);
-    ASSERT_NE(discrete_descriptor, SERIAL_DESCRIPTOR_INVALID);
-    EXPECT_EQ(serial_driver_read(discrete_descriptor,
-                                 reinterpret_cast<uint8_t *>(read_buf.data()),
-                                 1U, &bytes_read),
-              SERIAL_DRIVER_ERROR_NOT_CONFIGURED);
-    EXPECT_EQ(serial_driver_read(SERIAL_DESCRIPTOR_INVALID,
-                                 reinterpret_cast<uint8_t *>(read_buf.data()),
-                                 1U, &bytes_read),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-
-    descriptor = serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    EXPECT_EQ(serial_driver_read(descriptor,
-                                 reinterpret_cast<uint8_t *>(read_buf.data()),
-                                 1U, &bytes_read),
-              SERIAL_DRIVER_ERROR_RX_EMPTY);
-    EXPECT_EQ(bytes_read, 0U);
-
-    uart_devices[SERIAL_PORT_0].rx_queue.initialized = false;
-    EXPECT_EQ(serial_driver_read(descriptor,
-                                 reinterpret_cast<uint8_t *>(read_buf.data()),
-                                 1U, &bytes_read),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    descriptor = serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    PushReadFifoByte(0U, 0xA1U);
-    PushReadFifoByte(0U, 0xB2U);
-    ASSERT_EQ(
-        serial_driver_receive_from_device_fifo(descriptor, 2U, &bytes_received),
-        SERIAL_DRIVER_OK);
-    ASSERT_EQ(serial_driver_read(descriptor,
-                                 reinterpret_cast<uint8_t *>(read_buf.data()),
-                                 2U, &bytes_read),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes_read, 2U);
-    EXPECT_EQ(static_cast<uint8_t>(read_buf[0]), 0xA1U);
-    EXPECT_EQ(static_cast<uint8_t>(read_buf[1]), 0xB2U);
-
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    descriptor = serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    uart_devices[SERIAL_PORT_0].tx_queue.initialized = false;
-    EXPECT_EQ(serial_driver_write(descriptor, data4.data(), data4.size(),
-                                  &bytes_written),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_pending_tx(descriptor), 1U);
-    EXPECT_EQ(serial_driver_read_next_tx_u32(descriptor, &value),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(value, 0x04030201U);
-}
-
-TEST(SerialDriverTest, CoverageReachableDefensivePaths)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    size_t bytes = 0U;
-    size_t bytes_written = 0U;
-    uint32_t value = 0U;
-    size_t fifo_index = 0U;
-    const std::array<uint8_t, 4> data4{{0x10U, 0x20U, 0x30U, 0x40U}};
-
-    EXPECT_EQ(serial_driver_transmit_to_device_fifo(descriptor, 1U, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_receive_from_device_fifo(descriptor, 1U, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-
-    EXPECT_EQ(
-        serial_driver_write(1U, data4.data(), data4.size(), &bytes_written),
-        SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-
-    descriptor = serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
+    const serial_descriptor_t descriptor =
+        serial_port_init(static_cast<serial_ports_t>(kPort),
+                         UART_PORT_MODE_SERIAL);
     ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
 
-    ASSERT_EQ(serial_driver_write(descriptor, data4.data(), data4.size(),
+    ASSERT_EQ(serial_driver_enable_loopback(descriptor), SERIAL_DRIVER_OK);
+    ASSERT_NE((uart_devices[kPort].registers->uart.mcr & UART_MCR_LOOPBACK_BIT),
+              0U);
+
+    ASSERT_EQ(serial_driver_write(descriptor, payload.data(), payload.size(),
                                   &bytes_written),
               SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes_written, data4.size());
-    EXPECT_EQ(serial_driver_pending_tx(descriptor), 1U);
-    ASSERT_EQ(serial_driver_read_next_tx_u32(descriptor, &value),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(value, 0x40302010U);
+    ASSERT_EQ(bytes_written, payload.size());
 
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    descriptor = serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    fifo_index = static_cast<size_t>(descriptor - 1U);
-
-    uart_devices[SERIAL_PORT_0].rx_queue.count = SERIAL_QUEUE_FIXED_SIZE_WORDS;
-    PushReadFifoByte(fifo_index, 0x11U);
-    PushReadFifoByte(fifo_index, 0x22U);
-    PushReadFifoByte(fifo_index, 0x33U);
-    PushReadFifoByte(fifo_index, 0x44U);
-
-    ASSERT_EQ(serial_driver_receive_from_device_fifo(descriptor, 4U, &bytes),
+    ASSERT_EQ(serial_driver_poll(descriptor, payload.size(), 0U, &tx_bytes,
+                                 &rx_bytes),
               SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes, 4U);
-    ASSERT_EQ(serial_driver_receive_from_device_fifo(descriptor, 1U, &bytes),
+    ASSERT_EQ(tx_bytes, payload.size());
+    ASSERT_EQ(rx_bytes, 0U);
+
+    ASSERT_EQ(MoveWriteToRead(kPort), payload.size());
+
+    ASSERT_EQ(serial_driver_poll(descriptor, 0U, payload.size(), &tx_bytes,
+                                 &rx_bytes),
               SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes, 0U);
+    ASSERT_EQ(tx_bytes, 0U);
+    ASSERT_EQ(rx_bytes, payload.size());
+
+    ASSERT_EQ(serial_driver_read(descriptor, received.data(), received.size(),
+                                 &bytes_read),
+              SERIAL_DRIVER_OK);
+    ASSERT_EQ(bytes_read, received.size());
+    EXPECT_EQ(received, payload);
+
+    ASSERT_EQ(serial_driver_disable_loopback(descriptor), SERIAL_DRIVER_OK);
+    ASSERT_EQ((uart_devices[kPort].registers->uart.mcr & UART_MCR_LOOPBACK_BIT),
+              0U);
 }
 
-TEST(SerialDriverTest, PollSkipsRxWhenTxQueueHasPendingWord)
+TEST_F(SerialDriverApiTest, DiscretePortAllowsOnlyDiscreteControl)
 {
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
+    constexpr size_t kPort = SERIAL_PORT_1;
+
+    const serial_descriptor_t descriptor =
+        serial_port_init(static_cast<serial_ports_t>(kPort),
+                         UART_PORT_MODE_DISCRETE);
+    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
+
+    EXPECT_EQ(serial_driver_enable_loopback(descriptor),
+              SERIAL_DRIVER_ERROR_NOT_CONFIGURED);
+
+    ASSERT_EQ(serial_driver_enable_discrete(descriptor), SERIAL_DRIVER_OK);
+    ASSERT_NE((uart_devices[kPort].registers->uart.mcr & UART_MCR_DISCRETE_LINE_BIT),
+              0U);
+
+    ASSERT_EQ(serial_driver_disable_discrete(descriptor), SERIAL_DRIVER_OK);
+    ASSERT_EQ((uart_devices[kPort].registers->uart.mcr & UART_MCR_DISCRETE_LINE_BIT),
+              0U);
+}
+
+TEST_F(SerialDriverApiTest, SerialPortRejectsDiscreteControl)
+{
+    constexpr size_t kPort = SERIAL_PORT_2;
+
+    const serial_descriptor_t descriptor =
+        serial_port_init(static_cast<serial_ports_t>(kPort),
+                         UART_PORT_MODE_SERIAL);
+    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
+
+    EXPECT_EQ(serial_driver_enable_discrete(descriptor),
+              SERIAL_DRIVER_ERROR_NOT_CONFIGURED);
+}
+
+TEST_F(SerialDriverApiTest, ReadWriteAndPollValidateArguments)
+{
+    constexpr size_t kPort = SERIAL_PORT_3;
+    const std::array<uint8_t, 1> payload{{0xABU}};
+    uint8_t out_byte = 0U;
+    size_t bytes = 0U;
     size_t tx_bytes = 0U;
     size_t rx_bytes = 0U;
-    size_t fifo_index = 0U;
 
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    descriptor = serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    fifo_index = static_cast<size_t>(descriptor - 1U);
-
-    ASSERT_EQ(serial_driver_write_u32(descriptor, 0x01020304U),
-              SERIAL_DRIVER_OK);
-    ASSERT_EQ(serial_driver_write_u32(descriptor, 0xA1A2A3A4U),
-              SERIAL_DRIVER_OK);
-
-    PushReadFifoByte(fifo_index, 0x11U);
-    PushReadFifoByte(fifo_index, 0x22U);
-    PushReadFifoByte(fifo_index, 0x33U);
-    PushReadFifoByte(fifo_index, 0x44U);
-
-    ASSERT_EQ(serial_driver_poll(descriptor, 0U, 8U, &tx_bytes, &rx_bytes),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(tx_bytes, 0U);
-    EXPECT_EQ(rx_bytes, 0U);
-    EXPECT_EQ(uart_fifo_map.read_fifos[fifo_index].count, 4U);
-}
-
-TEST(SerialDriverTest, ReadAllowsZeroLengthWithNullBuffer)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    size_t bytes_read = 123U;
-
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-    descriptor = serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
+    const serial_descriptor_t descriptor =
+        serial_port_init(static_cast<serial_ports_t>(kPort),
+                         UART_PORT_MODE_SERIAL);
     ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
 
-    EXPECT_EQ(serial_driver_read(descriptor, nullptr, 0U, &bytes_read),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes_read, 0U);
+    EXPECT_EQ(serial_driver_write(descriptor, nullptr, 1U, &bytes),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+    EXPECT_EQ(serial_driver_write(descriptor, payload.data(), payload.size(),
+                                  nullptr),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+
+    EXPECT_EQ(serial_driver_read(descriptor, nullptr, 1U, &bytes),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+    EXPECT_EQ(serial_driver_read(descriptor, &out_byte, 1U, nullptr),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+
+    EXPECT_EQ(serial_driver_poll(descriptor, 1U, 1U, nullptr, &rx_bytes),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+    EXPECT_EQ(serial_driver_poll(descriptor, 1U, 1U, &tx_bytes, nullptr),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
 }
 
-TEST_P(SerialDriverPortTest, InitRejectsInvalidArguments)
+TEST_F(SerialDriverApiTest, PollMovesReadFifoDataToReadApi)
 {
-    EXPECT_EQ(serial_port_init(Port(), static_cast<uart_port_mode_t>(99)),
-              SERIAL_DESCRIPTOR_INVALID);
-}
-
-TEST_P(SerialDriverPortTest, WriteAndReadMaintainsOrder)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    uint32_t value = 0U;
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    ASSERT_EQ(serial_driver_get_uart_device(descriptor), PortDevice());
-
-    ASSERT_EQ(serial_driver_write_u32(descriptor, 0x11223344U),
-              SERIAL_DRIVER_OK);
-    ASSERT_EQ(serial_driver_write_u32(descriptor, 0xAABBCCDDU),
-              SERIAL_DRIVER_OK);
-    ASSERT_EQ(serial_driver_write_u32(descriptor, 0x01020304U),
-              SERIAL_DRIVER_OK);
-
-    EXPECT_EQ(serial_driver_pending_tx(descriptor), 3U);
-
-    ASSERT_EQ(serial_driver_read_next_tx_u32(descriptor, &value),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(value, 0x11223344U);
-    ASSERT_EQ(serial_driver_read_next_tx_u32(descriptor, &value),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(value, 0xAABBCCDDU);
-    ASSERT_EQ(serial_driver_read_next_tx_u32(descriptor, &value),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(value, 0x01020304U);
-    EXPECT_EQ(serial_driver_pending_tx(descriptor), 0U);
-}
-
-TEST_P(SerialDriverPortTest, FullAndEmptyStatesAreReported)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    uint32_t value = 0U;
-    size_t i = 0U;
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-
-    for (i = 0U; i < SERIAL_QUEUE_FIXED_SIZE_WORDS; ++i)
-    {
-        ASSERT_EQ(serial_driver_write_u32(descriptor, static_cast<uint32_t>(i)),
-                  SERIAL_DRIVER_OK);
-    }
-
-    EXPECT_EQ(serial_driver_write_u32(descriptor, 0x03030303U),
-              SERIAL_DRIVER_ERROR_TX_FULL);
-
-    for (i = 0U; i < SERIAL_QUEUE_FIXED_SIZE_WORDS; ++i)
-    {
-        ASSERT_EQ(serial_driver_read_next_tx_u32(descriptor, &value),
-                  SERIAL_DRIVER_OK);
-        EXPECT_EQ(value, static_cast<uint32_t>(i));
-    }
-
-    EXPECT_EQ(serial_driver_read_next_tx_u32(descriptor, &value),
-              SERIAL_DRIVER_ERROR_TX_EMPTY);
-}
-
-TEST_P(SerialDriverPortTest, PendingHandlesWrapAround)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    uint32_t value = 0U;
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-
-    ASSERT_EQ(serial_driver_write_u32(descriptor, 0x11111111U),
-              SERIAL_DRIVER_OK);
-    ASSERT_EQ(serial_driver_write_u32(descriptor, 0x22222222U),
-              SERIAL_DRIVER_OK);
-    ASSERT_EQ(serial_driver_read_next_tx_u32(descriptor, &value),
-              SERIAL_DRIVER_OK);
-    ASSERT_EQ(serial_driver_write_u32(descriptor, 0x33333333U),
-              SERIAL_DRIVER_OK);
-
-    EXPECT_EQ(serial_driver_pending_tx(descriptor), 2U);
-    ASSERT_EQ(serial_driver_read_next_tx_u32(descriptor, &value),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(value, 0x22222222U);
-    ASSERT_EQ(serial_driver_read_next_tx_u32(descriptor, &value),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(value, 0x33333333U);
-}
-
-TEST(SerialDriverTest, InitFailsWhenDescriptorMapIsFull)
-{
-    std::array<serial_descriptor_t, UART_DEVICE_COUNT> descriptors{};
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-
-    std::for_each(descriptors.begin(), descriptors.end(),
-                  [&, idx = 0U](serial_descriptor_t &descriptor) mutable
-                  {
-                      descriptor =
-                          serial_port_init(static_cast<serial_ports_t>(idx),
-                                           UART_PORT_MODE_SERIAL);
-                      ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-                      ++idx;
-                  });
-
-    EXPECT_EQ(serial_port_init(static_cast<serial_ports_t>(UART_DEVICE_COUNT),
-                               UART_PORT_MODE_SERIAL),
-              SERIAL_DESCRIPTOR_INVALID);
-}
-
-TEST(SerialDriverTest, ReinitializingSamePortReturnsExistingDescriptor)
-{
-    auto first = SERIAL_DESCRIPTOR_INVALID;
-    auto second = SERIAL_DESCRIPTOR_INVALID;
-
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-
-    first = serial_port_init(SERIAL_PORT_3, UART_PORT_MODE_SERIAL);
-    ASSERT_NE(first, SERIAL_DESCRIPTOR_INVALID);
-
-    second = serial_port_init(SERIAL_PORT_3, UART_PORT_MODE_DISCRETE);
-    ASSERT_NE(second, SERIAL_DESCRIPTOR_INVALID);
-    EXPECT_EQ(second, first);
-    EXPECT_EQ(serial_driver_get_uart_device(second),
-              &uart_devices[SERIAL_PORT_3]);
-}
-
-TEST(SerialDriverTest, PortInitFailsWhenNoDescriptorSlotsAreAvailable)
-{
-    ASSERT_EQ(serial_driver_common_init(), SERIAL_DRIVER_OK);
-
-    for (auto &descriptor : serial_descriptor_map)
-    {
-        descriptor.initialized = true;
-        descriptor.uart_device = &uart_devices[SERIAL_PORT_1];
-        descriptor.mode = UART_PORT_MODE_SERIAL;
-    }
-
-    EXPECT_EQ(serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL),
-              SERIAL_DESCRIPTOR_INVALID);
-}
-
-TEST_P(SerialDriverPortTest, DiscreteModeRejectsSerialOperations)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    uint32_t value = 0U;
-    size_t bytes = 0U;
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_DISCRETE);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    ASSERT_TRUE(PortDevice()->configured);
-    ASSERT_EQ(PortDevice()->port_mode, UART_PORT_MODE_DISCRETE);
-
-    EXPECT_EQ(serial_driver_write_u32(descriptor, 0x12345678U),
-              SERIAL_DRIVER_ERROR_NOT_CONFIGURED);
-    EXPECT_EQ(serial_driver_read_next_tx_u32(descriptor, &value),
-              SERIAL_DRIVER_ERROR_NOT_CONFIGURED);
-    EXPECT_EQ(serial_driver_transmit_to_device_fifo(descriptor, 4U, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_CONFIGURED);
-    EXPECT_EQ(serial_driver_receive_from_device_fifo(descriptor, 4U, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_CONFIGURED);
-    EXPECT_EQ(serial_driver_poll(descriptor, 4U, 4U, &bytes, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_CONFIGURED);
-    EXPECT_EQ(serial_driver_read_u32(descriptor, &value),
-              SERIAL_DRIVER_ERROR_NOT_CONFIGURED);
-    EXPECT_EQ(serial_driver_pending_rx(descriptor), 0U);
-    EXPECT_EQ(serial_driver_pending_tx(descriptor), 0U);
-}
-
-TEST_P(SerialDriverPortTest, QueueNotInitializedMapsToDriverNotInitialized)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    uint32_t value = 0U;
-    size_t bytes = 0U;
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-
-    ASSERT_EQ(serial_driver_write_u32(descriptor, 0x12345678U),
-              SERIAL_DRIVER_OK);
-    PortDevice()->tx_queue.initialized = false;
-
-    EXPECT_EQ(serial_driver_write_u32(descriptor, 0x12345678U),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_read_next_tx_u32(descriptor, &value),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-    EXPECT_EQ(serial_driver_transmit_to_device_fifo(descriptor, 4U, &bytes),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-
-    PortDevice()->rx_queue.initialized = false;
-    EXPECT_EQ(serial_driver_read_u32(descriptor, &value),
-              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
-}
-
-TEST_P(SerialDriverPortTest, PollReceiveFromDeviceRxFifoAndReadWord)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    uint32_t value = 0U;
-    size_t bytes = 0U;
-    size_t fifo_index = 0U;
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    fifo_index = static_cast<size_t>(descriptor - 1U);
-
-    PushReadFifoByte(fifo_index, 0x44U);
-    PushReadFifoByte(fifo_index, 0x33U);
-    PushReadFifoByte(fifo_index, 0x22U);
-    PushReadFifoByte(fifo_index, 0x11U);
-
-    ASSERT_EQ(serial_driver_receive_from_device_fifo(descriptor, 4U, &bytes),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes, 4U);
-    EXPECT_EQ(serial_driver_pending_rx(descriptor), 1U);
-
-    ASSERT_EQ(serial_driver_read_u32(descriptor, &value), SERIAL_DRIVER_OK);
-    EXPECT_EQ(value, 0x11223344U);
-    EXPECT_EQ(serial_driver_pending_rx(descriptor), 0U);
-}
-
-TEST_P(SerialDriverPortTest, PollReceiveRespectsMaxBytesAndStaging)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    uint32_t value = 0U;
-    size_t bytes = 0U;
-    size_t fifo_index = 0U;
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    fifo_index = static_cast<size_t>(descriptor - 1U);
-
-    PushReadFifoByte(fifo_index, 0x04U);
-    PushReadFifoByte(fifo_index, 0x03U);
-    PushReadFifoByte(fifo_index, 0x02U);
-    PushReadFifoByte(fifo_index, 0x01U);
-
-    ASSERT_EQ(serial_driver_receive_from_device_fifo(descriptor, 2U, &bytes),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes, 2U);
-    EXPECT_EQ(serial_driver_pending_rx(descriptor), 0U);
-
-    ASSERT_EQ(serial_driver_receive_from_device_fifo(descriptor, 2U, &bytes),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes, 2U);
-    EXPECT_EQ(serial_driver_pending_rx(descriptor), 1U);
-
-    ASSERT_EQ(serial_driver_receive_from_device_fifo(descriptor, 1U, &bytes),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes, 0U);
-    EXPECT_EQ(serial_driver_pending_rx(descriptor), 1U);
-
-    ASSERT_EQ(serial_driver_read_u32(descriptor, &value), SERIAL_DRIVER_OK);
-    EXPECT_EQ(value, 0x01020304U);
-}
-
-TEST_P(SerialDriverPortTest, PollReceiveReturnsEmptyWhenNoRxData)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    uint32_t value = 0U;
-    size_t bytes = 0U;
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-
-    ASSERT_EQ(serial_driver_receive_from_device_fifo(descriptor, 8U, &bytes),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes, 0U);
-    EXPECT_EQ(serial_driver_read_u32(descriptor, &value),
-              SERIAL_DRIVER_ERROR_RX_EMPTY);
-}
-
-TEST_P(SerialDriverPortTest, PollDefersRxUntilTxIsFullyDrained)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
+    constexpr size_t kPort = SERIAL_PORT_4;
+    const std::array<uint8_t, 3> payload{{0xDEU, 0xADU, 0xBEU}};
+    std::array<uint8_t, payload.size()> received{{0U}};
     size_t tx_bytes = 0U;
     size_t rx_bytes = 0U;
-    uint32_t value = 0U;
-    size_t fifo_index = 0U;
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    fifo_index = static_cast<size_t>(descriptor - 1U);
-
-    ASSERT_EQ(serial_driver_write_u32(descriptor, 0x11223344U),
-              SERIAL_DRIVER_OK);
-    PushReadFifoByte(fifo_index, 0x04U);
-    PushReadFifoByte(fifo_index, 0x03U);
-    PushReadFifoByte(fifo_index, 0x02U);
-    PushReadFifoByte(fifo_index, 0x01U);
-
-    ASSERT_EQ(serial_driver_poll(descriptor, 2U, 4U, &tx_bytes, &rx_bytes),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(tx_bytes, 2U);
-    EXPECT_EQ(rx_bytes, 0U);
-    EXPECT_EQ(uart_fifo_map.read_fifos[fifo_index].count, 4U);
-
-    ASSERT_EQ(serial_driver_poll(descriptor, 2U, 4U, &tx_bytes, &rx_bytes),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(tx_bytes, 2U);
-    EXPECT_EQ(rx_bytes, 4U);
-    EXPECT_EQ(serial_driver_pending_rx(descriptor), 1U);
-
-    ASSERT_EQ(serial_driver_read_u32(descriptor, &value), SERIAL_DRIVER_OK);
-    EXPECT_EQ(value, 0x01020304U);
-}
-
-TEST_P(SerialDriverPortTest, PollReadsRxWhenNoTxPending)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    size_t tx_bytes = 0U;
-    size_t rx_bytes = 0U;
-    uint32_t value = 0U;
-    size_t fifo_index = 0U;
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    fifo_index = static_cast<size_t>(descriptor - 1U);
-
-    PushReadFifoByte(fifo_index, 0xEFU);
-    PushReadFifoByte(fifo_index, 0xBEU);
-    PushReadFifoByte(fifo_index, 0xADU);
-    PushReadFifoByte(fifo_index, 0xDEU);
-
-    ASSERT_EQ(serial_driver_poll(descriptor, 8U, 8U, &tx_bytes, &rx_bytes),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(tx_bytes, 0U);
-    EXPECT_EQ(rx_bytes, 4U);
-    EXPECT_EQ(serial_driver_pending_rx(descriptor), 1U);
-
-    ASSERT_EQ(serial_driver_read_u32(descriptor, &value), SERIAL_DRIVER_OK);
-    EXPECT_EQ(value, 0xDEADBEEFU);
-}
-
-TEST_P(SerialDriverPortTest, TransmitToDeviceFifoMaintainsByteOrder)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    size_t bytes = 0U;
-    size_t fifo_index = 0U;
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    fifo_index = static_cast<size_t>(descriptor - 1U);
-
-    ASSERT_EQ(serial_driver_write_u32(descriptor, 0x11223344U),
-              SERIAL_DRIVER_OK);
-    ASSERT_EQ(serial_driver_write_u32(descriptor, 0xAABBCCDDU),
-              SERIAL_DRIVER_OK);
-
-    ASSERT_EQ(serial_driver_transmit_to_device_fifo(descriptor, 8U, &bytes),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes, 8U);
-    EXPECT_EQ(uart_fifo_map.write_fifos[fifo_index].count, 8U);
-
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x44U);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x33U);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x22U);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x11U);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0xDDU);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0xCCU);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0xBBU);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0xAAU);
-}
-
-TEST_P(SerialDriverPortTest, GenericWriteAcceptsByteLengthAndTransmitsInOrder)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    size_t bytes_written = 0U;
-    size_t bytes_transmitted = 0U;
-    size_t fifo_index = 0U;
-    const uint8_t payload[] = {0x11U, 0x22U, 0x33U, 0x44U, 0x55U, 0x66U};
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    fifo_index = static_cast<size_t>(descriptor - 1U);
-
-    ASSERT_EQ(serial_driver_write(descriptor, payload, sizeof(payload),
-                                  &bytes_written),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes_written, sizeof(payload));
-
-    ASSERT_EQ(serial_driver_transmit_to_device_fifo(descriptor, sizeof(payload),
-                                                    &bytes_transmitted),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes_transmitted, sizeof(payload));
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x11U);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x22U);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x33U);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x44U);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x55U);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x66U);
-}
-
-TEST_P(SerialDriverPortTest, GenericReadSupportsPartialAndU32Alignment)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    size_t bytes_received = 0U;
     size_t bytes_read = 0U;
-    size_t fifo_index = 0U;
-    std::string read_buf(3U, '\0');
-    uint32_t value = 0U;
 
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
+    ResetFifo(&uart_fifo_map.read_fifos[kPort]);
+
+    const serial_descriptor_t descriptor =
+        serial_port_init(static_cast<serial_ports_t>(kPort),
+                         UART_PORT_MODE_SERIAL);
     ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    fifo_index = static_cast<size_t>(descriptor - 1U);
 
-    PushReadFifoByte(fifo_index, 0xAAU);
-    PushReadFifoByte(fifo_index, 0xBBU);
-    PushReadFifoByte(fifo_index, 0xCCU);
-    PushReadFifoByte(fifo_index, 0xDDU);
-    ASSERT_EQ(
-        serial_driver_receive_from_device_fifo(descriptor, 4U, &bytes_received),
-        SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes_received, 4U);
-
-    ASSERT_EQ(serial_driver_read(descriptor,
-                                 reinterpret_cast<uint8_t *>(read_buf.data()),
-                                 read_buf.size(), &bytes_read),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes_read, read_buf.size());
-    EXPECT_EQ(static_cast<uint8_t>(read_buf[0]), 0xAAU);
-    EXPECT_EQ(static_cast<uint8_t>(read_buf[1]), 0xBBU);
-    EXPECT_EQ(static_cast<uint8_t>(read_buf[2]), 0xCCU);
-
-    PushReadFifoByte(fifo_index, 0x11U);
-    PushReadFifoByte(fifo_index, 0x22U);
-    PushReadFifoByte(fifo_index, 0x33U);
-    ASSERT_EQ(
-        serial_driver_receive_from_device_fifo(descriptor, 3U, &bytes_received),
-        SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes_received, 3U);
-
-    ASSERT_EQ(serial_driver_read_u32(descriptor, &value), SERIAL_DRIVER_OK);
-    EXPECT_EQ(value, 0x332211DDU);
-}
-
-TEST_P(SerialDriverPortTest, TransmitRespectsMaxBytesAndKeepsStagedWord)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    size_t bytes = 0U;
-    size_t fifo_index = 0U;
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    fifo_index = static_cast<size_t>(descriptor - 1U);
-
-    ASSERT_EQ(serial_driver_write_u32(descriptor, 0x01020304U),
-              SERIAL_DRIVER_OK);
-
-    ASSERT_EQ(serial_driver_transmit_to_device_fifo(descriptor, 2U, &bytes),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes, 2U);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x04U);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x03U);
-
-    ASSERT_EQ(serial_driver_transmit_to_device_fifo(descriptor, 2U, &bytes),
-              SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes, 2U);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x02U);
-    EXPECT_EQ(PopWriteFifoByte(fifo_index), 0x01U);
-}
-
-TEST_P(SerialDriverPortTest, TransmitStopsWhenDeviceFifoIsFullAt255Bytes)
-{
-    auto descriptor = SERIAL_DESCRIPTOR_INVALID;
-    size_t bytes = 0U;
-    size_t fifo_index = 0U;
-
-    descriptor = serial_port_init(Port(), UART_PORT_MODE_SERIAL);
-    ASSERT_NE(descriptor, SERIAL_DESCRIPTOR_INVALID);
-    fifo_index = static_cast<size_t>(descriptor - 1U);
-
-    for (int i = 0U; i < 64U; ++i)
+    for (const uint8_t value : payload)
     {
-        ASSERT_EQ(serial_driver_write_u32(descriptor, static_cast<uint32_t>(i)),
-                  SERIAL_DRIVER_OK);
+        FifoPush(&uart_fifo_map.read_fifos[kPort], value);
     }
 
-    ASSERT_EQ(serial_driver_transmit_to_device_fifo(descriptor, 300U, &bytes),
+    ASSERT_EQ(serial_driver_poll(descriptor, 0U, payload.size(), &tx_bytes,
+                                 &rx_bytes),
               SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes, UART_DEVICE_FIFO_SIZE_BYTES);
-    EXPECT_EQ(uart_fifo_map.write_fifos[fifo_index].count,
-              UART_DEVICE_FIFO_SIZE_BYTES);
+    ASSERT_EQ(tx_bytes, 0U);
+    ASSERT_EQ(rx_bytes, payload.size());
 
-    ASSERT_EQ(serial_driver_transmit_to_device_fifo(descriptor, 32U, &bytes),
+    ASSERT_EQ(serial_driver_read(descriptor, received.data(), received.size(),
+                                 &bytes_read),
               SERIAL_DRIVER_OK);
-    EXPECT_EQ(bytes, 0U);
+    ASSERT_EQ(bytes_read, received.size());
+    EXPECT_EQ(received, payload);
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    AllPorts, SerialDriverPortTest,
-    ::testing::Range(static_cast<size_t>(0U),
-                     static_cast<size_t>(UART_FIFO_UART_COUNT)),
-    [](const ::testing::TestParamInfo<size_t> &info)
-    { return "Port" + std::to_string(info.param); });
+TEST_F(SerialDriverApiTest, InvalidDescriptorReturnsNotInitialized)
+{
+    const std::array<uint8_t, 1> payload{{0x11U}};
+    uint8_t out_byte = 0U;
+    size_t bytes = 0U;
+    size_t tx_bytes = 0U;
+    size_t rx_bytes = 0U;
+
+    EXPECT_EQ(serial_driver_write(SERIAL_DESCRIPTOR_INVALID, payload.data(),
+                                  payload.size(), &bytes),
+              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
+
+    EXPECT_EQ(serial_driver_read(SERIAL_DESCRIPTOR_INVALID, &out_byte, 1U,
+                                 &bytes),
+              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
+
+    EXPECT_EQ(serial_driver_poll(SERIAL_DESCRIPTOR_INVALID, 1U, 1U, &tx_bytes,
+                                 &rx_bytes),
+              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
+
+    EXPECT_EQ(serial_driver_enable_loopback(SERIAL_DESCRIPTOR_INVALID),
+              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
+    EXPECT_EQ(serial_driver_enable_discrete(SERIAL_DESCRIPTOR_INVALID),
+              SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
+}

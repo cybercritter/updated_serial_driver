@@ -46,6 +46,9 @@ typedef enum
     SERIAL_DRIVER_ERROR_INVALID_PORT = UART_ERROR_INVALID_ARG,
 } serial_driver_error_t;
 
+/**
+ * @brief UART port identifiers for serial descriptor allocation.
+ */
 typedef enum SERIAL_PORTS
 {
     SERIAL_PORT_0,
@@ -57,14 +60,6 @@ typedef enum SERIAL_PORTS
     SERIAL_PORT_6,
     SERIAL_PORT_7,
 } serial_ports_t;
-/**
- * @brief Initialize common serial-driver state shared across UART ports.
- *
- * Must be called before @ref serial_port_init.
- *
- * @return @ref SERIAL_DRIVER_OK on success.
- */
-serial_driver_error_t serial_driver_common_init(void);
 
 /**
  * @brief Initialize one UART port instance and return its descriptor.
@@ -94,66 +89,58 @@ serial_driver_error_t serial_driver_write(serial_descriptor_t descriptor,
                                           size_t *out_bytes_written);
 
 /**
- * @brief Queue one 32-bit value for transmit.
+ * @brief Read received bytes into a user buffer.
  *
  * @param descriptor Initialized serial descriptor.
- * @param value 32-bit value to enqueue.
+ * @param data Output byte buffer.
+ * @param length Maximum number of bytes to read.
+ * @param out_bytes_read Output number of bytes read.
  * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
  */
-serial_driver_error_t serial_driver_write_u32(serial_descriptor_t descriptor,
-                                              uint32_t value);
+serial_driver_error_t serial_driver_read(serial_descriptor_t descriptor,
+                                         uint8_t *data, size_t length,
+                                         size_t *out_bytes_read);
 
 /**
- * @brief Read and remove the next queued 32-bit TX value.
- *
- * @param descriptor Initialized serial descriptor.
- * @param out_value Output pointer for the dequeued 32-bit value.
- * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
- */
-serial_driver_error_t
-serial_driver_read_next_tx_u32(serial_descriptor_t descriptor,
-                               uint32_t *out_value);
-
-/**
- * @brief Transmit queued data bytes into the device TX FIFO.
- *
- * Converts queued 32-bit words to bytes (LSB first) and writes into the
- * per-device FIFO up to @p max_bytes or until FIFO/data limits are reached.
+ * @brief Enable UART local loopback for a serial descriptor.
  *
  * @param descriptor Serial descriptor.
- * @param max_bytes Maximum number of bytes to transmit this call.
- * @param out_bytes_transmitted Output number of bytes actually transmitted.
  * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
  */
 serial_driver_error_t
-serial_driver_transmit_to_device_fifo(serial_descriptor_t descriptor,
-                                      size_t max_bytes,
-                                      size_t *out_bytes_transmitted);
+serial_driver_enable_loopback(serial_descriptor_t descriptor);
 
 /**
- * @brief Poll bytes from the device RX FIFO into the software RX queue.
- *
- * Collects incoming bytes from the per-device RX FIFO and assembles 32-bit
- * words (LSB first) into the RX queue.
+ * @brief Disable UART local loopback for a serial descriptor.
  *
  * @param descriptor Serial descriptor.
- * @param max_bytes Maximum number of bytes to poll this call.
- * @param out_bytes_received Output number of bytes actually consumed.
  * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
  */
 serial_driver_error_t
-serial_driver_receive_from_device_fifo(serial_descriptor_t descriptor,
-                                       size_t max_bytes,
-                                       size_t *out_bytes_received);
+serial_driver_disable_loopback(serial_descriptor_t descriptor);
+
+/**
+ * @brief Assert the discrete control line bit (#RTS) for a discrete
+ * descriptor.
+ *
+ * @param descriptor Serial descriptor.
+ * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
+ */
+serial_driver_error_t
+serial_driver_enable_discrete(serial_descriptor_t descriptor);
+
+/**
+ * @brief Deassert the discrete control line bit (#RTS) for a discrete
+ * descriptor.
+ *
+ * @param descriptor Serial descriptor.
+ * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
+ */
+serial_driver_error_t
+serial_driver_disable_discrete(serial_descriptor_t descriptor);
 
 /**
  * @brief Poll one serial port: drain TX first, then service RX.
- *
- * This call transmits up to @p max_tx_bytes from the software TX queue into
- * the device TX FIFO. RX polling is performed only when TX is fully drained
- * (no queued TX words and no staged TX bytes remain), then up to
- * @p max_rx_bytes are consumed from the device RX FIFO into the software RX
- * queue.
  *
  * @param descriptor Serial descriptor.
  * @param max_tx_bytes Maximum TX bytes to write this call.
@@ -167,54 +154,5 @@ serial_driver_error_t serial_driver_poll(serial_descriptor_t descriptor,
                                          size_t max_rx_bytes,
                                          size_t *out_tx_bytes_transmitted,
                                          size_t *out_rx_bytes_received);
-
-/**
- * @brief Read received bytes into a user buffer.
- *
- * Reads bytes from the software RX path in-order.
- *
- * @param descriptor Serial descriptor.
- * @param data Output byte buffer.
- * @param length Maximum number of bytes to read.
- * @param out_bytes_read Output number of bytes read.
- * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
- */
-serial_driver_error_t serial_driver_read(serial_descriptor_t descriptor,
-                                         uint8_t *data, size_t length,
-                                         size_t *out_bytes_read);
-
-/**
- * @brief Read and remove the next queued 32-bit RX value.
- *
- * @param descriptor Serial descriptor.
- * @param out_value Output pointer for the dequeued 32-bit value.
- * @return @ref SERIAL_DRIVER_OK on success, otherwise an error code.
- */
-serial_driver_error_t serial_driver_read_u32(serial_descriptor_t descriptor,
-                                             uint32_t *out_value);
-
-/**
- * @brief Return number of queued RX words currently pending.
- *
- * @param descriptor Serial descriptor.
- * @return Number of queued RX words, or 0 if descriptor is invalid.
- */
-size_t serial_driver_pending_rx(serial_descriptor_t descriptor);
-
-/**
- * @brief Return number of queued TX words currently pending.
- *
- * @param descriptor Serial descriptor.
- * @return Number of queued words, or 0 if descriptor is invalid/uninitialized.
- */
-size_t serial_driver_pending_tx(serial_descriptor_t descriptor);
-
-/**
- * @brief Resolve descriptor to associated UART device.
- *
- * @param descriptor Serial descriptor.
- * @return Mapped UART device pointer, or NULL if descriptor is invalid.
- */
-uart_device_t *serial_driver_get_uart_device(serial_descriptor_t descriptor);
 
 #endif

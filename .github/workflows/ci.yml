@@ -25,8 +25,8 @@ jobs:
         run: >
           cmake -S . -B build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DSERIAL_DRIVER_BUILD_TESTS=ON
-          -DSERIAL_DRIVER_BUILD_DOCS=OFF
+          -DDEVICE_DRIVER_BUILD_TESTS=ON
+          -DDEVICE_DRIVER_BUILD_DOCS=OFF
 
       - name: Build
         run: cmake --build build --parallel
@@ -83,8 +83,8 @@ jobs:
         run: >
           cmake -S . -B build -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DSERIAL_DRIVER_BUILD_TESTS=OFF
-          -DSERIAL_DRIVER_BUILD_DOCS=ON
+          -DDEVICE_DRIVER_BUILD_TESTS=OFF
+          -DDEVICE_DRIVER_BUILD_DOCS=ON
 
       - name: Generate documentation
         run: cmake --build build --target docs --parallel

@@ -1,43 +1,62 @@
-# updated_serial_driver
+# updated_device_driver
 
-16550 UART driver starter project in C with CMake-based builds and GoogleTest unit tests.
+16550 / XR17C358-style UART driver in C with CMake-based builds and GoogleTest
+unit tests.
 
 ## Overview
 
 This repository provides:
 
-- A testable serial-driver pipeline for staged TX/RX word and byte movement.
-- 16550 UART register and device data structures for memory-mapped UART instances.
-- A global UART device table (`uart_devices`) for multi-UART systems.
-- A unit test target using GoogleTest to validate core queue behavior.
+- A descriptor-based serial driver API for up to 8 UART ports.
+- Poll-driven TX/RX data movement between software queues and per-port byte
+  FIFOs.
+- Serial-mode controls (local loopback) and discrete-mode control (#RTS line).
+- A pluggable hardware mapper callback for binding UART device slots to
+  platform register blocks.
 
 ## Project layout
 
-- `CMakeLists.txt`: build configuration, library target, and test integration.
+- `CMakeLists.txt`: build options, library target, tests, docs, and coverage.
+- `src/device_driver.c`: public serial driver implementation.
+- `include/device_driver/device_driver_internal.h`: internal helpers used by
+  `src/device_driver.c` (not a public API).
+- `src/hw_abstraction.c`: default hardware mapper and mapper registration.
+- `src/queue.c`: fixed-size 32-bit software queue implementation.
+- `src/registers.c`: global `uart_devices` and `uart_fifo_map` definitions.
 - `include/device_driver/device_driver.h`: public serial driver API.
-- `src/device_driver.c`: descriptor/state lifecycle and shared internals.
-- `src/device_driver_tx.c`: TX path implementation.
-- `src/device_driver_rx.c`: RX path and poll implementation.
-- `include/device_driver/register_map.h`: shared 16550 register map and offsets.
-- `include/device_driver/registers.h`: UART device-slot, FIFO map, and mode definitions.
-- `include/device_driver/hw_abstraction.h`: platform mapper hooks for UART register binding.
-- `include/device_driver/queue.h`: software queue types and queue helpers.
-- `include/device_driver/errors.h`: shared UART/driver error codes.
-- `src/hw_abstraction.c`: default mapper and mapper registration state.
-- `src/registers.c`: global UART device table definition.
-- `tests/test_device_driver.cpp`: unit tests.
+- `include/device_driver/hw_abstraction.h`: hardware mapping callback API.
+- `include/device_driver/registers.h`: UART device slot, FIFO map, and modes.
+- `include/device_driver/register_map.h`: 16550/XR17V358 register map types and
+  offset macros.
+- `include/device_driver/errors.h`: shared UART-level error codes.
+- `tests/test_device_driver.cpp`: GoogleTest coverage for serial/discrete APIs.
+- `tests/test_queue.cpp`: GoogleTest coverage for queue utilities.
+- `tests/device_driver_test_main.c`: C-only executable smoke test.
 
 ## Build requirements
 
 - CMake 3.21+
 - C11 compiler
 - C++11 compiler (tests only)
-- Network access during first configure to fetch GoogleTest
+- GoogleTest source:
+  - automatically downloaded when needed, or
+  - provided locally via `-DDEVICE_DRIVER_LOCAL_GTEST_SOURCE=/path/to/googletest`
+
+## CMake options
+
+- `DEVICE_DRIVER_BUILD_TESTS` (default: `ON`)
+- `DEVICE_DRIVER_BUILD_DOCS` (default: `ON`)
+- `DEVICE_DRIVER_ENABLE_COVERAGE` (default: `OFF`, requires GCC/Clang + gcovr)
+- `DEVICE_DRIVER_LOCAL_GTEST_SOURCE` (default: empty)
+
+Legacy option aliases are still accepted for compatibility:
+`SERIAL_DRIVER_BUILD_TESTS`, `SERIAL_DRIVER_BUILD_DOCS`,
+`SERIAL_DRIVER_ENABLE_COVERAGE`.
 
 ## Build
 
 ```bash
-cmake -S . -B build
+cmake -S . -B build -DDEVICE_DRIVER_BUILD_TESTS=ON -DDEVICE_DRIVER_BUILD_DOCS=OFF
 cmake --build build
 ```
 
@@ -47,12 +66,24 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-## Generate docs
-
-If Doxygen is installed, CMake provides a `docs` target:
+## Generate coverage
 
 ```bash
-cmake -S . -B build
+cmake -S . -B build -DDEVICE_DRIVER_ENABLE_COVERAGE=ON -DDEVICE_DRIVER_BUILD_DOCS=OFF
+cmake --build build --target coverage
+```
+
+Coverage outputs:
+
+- `build/coverage.xml`
+- `build/coverage.html`
+
+## Generate docs
+
+If Doxygen is installed:
+
+```bash
+cmake -S . -B build -DDEVICE_DRIVER_BUILD_DOCS=ON -DDEVICE_DRIVER_BUILD_TESTS=OFF
 cmake --build build --target docs
 ```
 
@@ -60,81 +91,79 @@ Generated HTML docs are written to `build/docs/html/index.html`.
 
 ## Public APIs
 
-### Core serial driver API
+Core serial driver API (`include/device_driver/device_driver.h`):
 
-Defined in `include/device_driver/device_driver.h`:
-
-- `serial_driver_common_init(...)`
 - `serial_port_init(...)`
 - `serial_driver_write(...)`
-- `serial_driver_write_u32(...)`
-- `serial_driver_read_next_tx_u32(...)`
-- `serial_driver_transmit_to_device_fifo(...)`
-- `serial_driver_receive_from_device_fifo(...)`
 - `serial_driver_read(...)`
-- `serial_driver_read_u32(...)`
 - `serial_driver_poll(...)`
-- `serial_driver_pending_rx(...)`
-- `serial_driver_pending_tx(...)`
-- `serial_driver_get_uart_device(...)`
+- `serial_driver_enable_loopback(...)`
+- `serial_driver_disable_loopback(...)`
+- `serial_driver_enable_discrete(...)`
+- `serial_driver_disable_discrete(...)`
 
-Status values:
+Driver status values:
 
 - `SERIAL_DRIVER_OK`
 - `SERIAL_DRIVER_ERROR_INVALID_ARG`
+- `SERIAL_DRIVER_ERROR_NOT_INITIALIZED`
+- `SERIAL_DRIVER_ERROR_NOT_CONFIGURED`
 - `SERIAL_DRIVER_ERROR_TX_FULL`
+- `SERIAL_DRIVER_ERROR_TX_EMPTY`
+- `SERIAL_DRIVER_ERROR_RX_FULL`
 - `SERIAL_DRIVER_ERROR_RX_EMPTY`
+- `SERIAL_DRIVER_ERROR_INVALID_PORT`
 
-Hardware mapping hooks:
+Hardware mapping hooks (`include/device_driver/hw_abstraction.h`):
 
 - `serial_driver_hw_set_mapper(...)`
 - `serial_driver_hw_reset_mapper(...)`
 
-### UART register/device API
+Register and device model headers:
 
-Defined in `include/device_driver/register_map.h`, `include/device_driver/registers.h`,
-`include/device_driver/hw_abstraction.h`, `include/device_driver/queue.h`, and
-`include/device_driver/errors.h`:
+- `include/device_driver/register_map.h`
+- `include/device_driver/registers.h`
+- `include/device_driver/queue.h`
+- `include/device_driver/errors.h`
 
-- `uart16550_registers_t`: memory-mapped 16550-compatible register block
-- `uart16550_data_reg_t`, `uart16550_interrupt_reg_t`, `uart16550_fifo_reg_t`: union aliases for overlapping 16550 register offsets
-- `uart_device_t`: one UART instance (register pointer, name, base address, mode, TX/RX queues)
-- `uart_byte_fifo_t` / `uart_fifo_map_t`: per-UART device FIFO models used by poll/transmit paths
-- `serial_queue_t`: software 32-bit circular queue used by TX/RX paths
-- `uart_port_mode_t`: serial/discrete port mode enum
-- `uart_error_t`: common UART and FIFO error enum
-- `serial_driver_hw_map_fn`: callback type for platform-specific register mapping
-- `uart_devices[UART_DEVICE_COUNT]`: global device table
-- `uart_fifo_map`: global read/write FIFO map for 8 UART channels
-- Register map table: `docs/register_map.md`
+## Implementation notes
 
-## Design notes
-
-- The internal word queue uses count-based full/empty tracking.
-- Register offset aliases are modeled with unions:
-  - Offset `0x00`: `RBR/THR/DLL`
-  - Offset `0x01`: `IER/DLM`
-  - Offset `0x02`: `IIR/FCR`
-- Hardware access fields are `volatile` to preserve register semantics.
+- `serial_driver_poll()` always services TX first. RX is serviced only when
+  there is no pending TX staged data or queued TX data.
+- TX/RX queues are word-based (`uint32_t`) with byte staging to preserve byte
+  ordering across API boundaries.
+- Serial/discrete mode gating is enforced per descriptor.
 
 ## Example usage
 
 ```c
 #include <stdint.h>
+
 #include "device_driver/device_driver.h"
 
-if (serial_driver_common_init() == SERIAL_DRIVER_OK) {
-    serial_descriptor_t descriptor =
-        serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
-    uint8_t data[1] = {0x55U};
-    size_t bytes_written = 0U;
-    (void)serial_driver_write(descriptor, data, sizeof(data), &bytes_written);
-}
+serial_descriptor_t descriptor =
+    serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
+
+uint8_t data[1] = {0x55U};
+size_t bytes_written = 0U;
+size_t tx_bytes = 0U;
+size_t rx_bytes = 0U;
+
+(void)serial_driver_enable_loopback(descriptor);
+(void)serial_driver_write(descriptor, data, sizeof(data), &bytes_written);
+(void)serial_driver_poll(descriptor, bytes_written, 0U, &tx_bytes, &rx_bytes);
 ```
 
-## Current scope and next steps
+## Current scope
 
-Current implementation covers queue management and register/device modeling. It does not yet include:
+Implemented:
 
-- UART initialization/configuration routines (baud, parity, stop bits)
-- Interrupt-driven TX/RX handlers
+- Descriptor allocation and per-port mode selection.
+- Software queueing and FIFO transfer helpers.
+- Poll-driven TX and RX data movement.
+- Loopback and discrete control-bit management.
+
+Not yet implemented:
+
+- UART line configuration (baud, parity, stop bits).
+- Interrupt-driven TX/RX handlers.

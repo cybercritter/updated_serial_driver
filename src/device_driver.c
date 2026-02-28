@@ -1,124 +1,5 @@
+#include "device_driver/device_driver.h"
 #include "device_driver/device_driver_internal.h"
-
-serial_descriptor_entry_t serial_descriptor_map[UART_DEVICE_COUNT] = {0};
-bool serial_driver_common_initialized = false;
-
-serial_descriptor_entry_t *
-serial_driver_get_entry(serial_descriptor_t descriptor)
-{
-    size_t index = 0U;
-
-    if (descriptor == SERIAL_DESCRIPTOR_INVALID)
-    {
-        return NULL;
-    }
-
-    index = (size_t)(descriptor - 1U);
-    if (index >= UART_DEVICE_COUNT)
-    {
-        return NULL;
-    }
-
-    if (!serial_descriptor_map[index].initialized)
-    {
-        return NULL;
-    }
-
-    return &serial_descriptor_map[index];
-}
-
-size_t serial_driver_descriptor_index(serial_descriptor_t descriptor)
-{
-    if (descriptor == SERIAL_DESCRIPTOR_INVALID)
-    {
-        return UART_DEVICE_COUNT;
-    }
-
-    serial_descriptor_entry_t *entry = serial_driver_get_entry(descriptor);
-    if (entry == NULL)
-    {
-        return UART_DEVICE_COUNT;
-    }
-
-    uint32_t port_index = entry->port_index;
-    if (port_index < UART_DEVICE_COUNT)
-    {
-        return (size_t)port_index;
-    }
-
-    return -1U;
-}
-
-void serial_driver_byte_fifo_reset(uart_byte_fifo_t *fifo)
-{
-    fifo->head = 0U;
-    fifo->tail = 0U;
-    fifo->count = 0U;
-}
-
-bool serial_driver_byte_fifo_is_full(const uart_byte_fifo_t *fifo)
-{
-    return fifo->count == UART_DEVICE_FIFO_SIZE_BYTES;
-}
-
-void serial_driver_byte_fifo_push(uart_byte_fifo_t *fifo, uint8_t byte)
-{
-    fifo->data[fifo->head] = byte;
-    fifo->head = (fifo->head + 1U) % UART_DEVICE_FIFO_SIZE_BYTES;
-    fifo->count += 1U;
-}
-
-bool serial_driver_byte_fifo_is_empty(const uart_byte_fifo_t *fifo)
-{
-    return fifo->count == 0U;
-}
-
-uint8_t serial_driver_byte_fifo_pop(uart_byte_fifo_t *fifo)
-{
-    uint8_t byte = fifo->data[fifo->tail];
-    fifo->tail = (fifo->tail + 1U) % UART_DEVICE_FIFO_SIZE_BYTES;
-    fifo->count -= 1U;
-    return byte;
-}
-
-size_t serial_driver_available_rx_bytes(const serial_descriptor_entry_t *entry)
-{
-    return (serial_queue_size(&entry->uart_device->rx_queue) *
-            sizeof(uint32_t)) +
-           entry->rx_output_staged_word_bytes + entry->rx_staged_word_bytes;
-}
-
-serial_driver_error_t serial_driver_common_init(void)
-{
-    size_t index = 0U;
-
-    for (index = 0U; index < UART_DEVICE_COUNT; ++index)
-    {
-        serial_descriptor_map[index].uart_device = NULL;
-        serial_descriptor_map[index].mode = UART_PORT_MODE_DISCRETE;
-        serial_descriptor_map[index].tx_input_staged_word = 0U;
-        serial_descriptor_map[index].tx_input_staged_word_bytes = 0U;
-        serial_descriptor_map[index].staged_word = 0U;
-        serial_descriptor_map[index].staged_word_bytes = 0U;
-        serial_descriptor_map[index].rx_staged_word = 0U;
-        serial_descriptor_map[index].rx_staged_word_bytes = 0U;
-        serial_descriptor_map[index].rx_output_staged_word = 0U;
-        serial_descriptor_map[index].rx_output_staged_word_bytes = 0U;
-        serial_descriptor_map[index].initialized = false;
-
-        uart_devices[index].configured = false;
-        uart_devices[index].port_mode = UART_PORT_MODE_DISCRETE;
-    }
-
-    for (index = 0U; index < UART_FIFO_UART_COUNT; ++index)
-    {
-        serial_driver_byte_fifo_reset(&uart_fifo_map.write_fifos[index]);
-        serial_driver_byte_fifo_reset(&uart_fifo_map.read_fifos[index]);
-    }
-
-    serial_driver_common_initialized = true;
-    return SERIAL_DRIVER_OK;
-}
 
 serial_descriptor_t serial_port_init(serial_ports_t port, uart_port_mode_t mode)
 {
@@ -128,7 +9,10 @@ serial_descriptor_t serial_port_init(serial_ports_t port, uart_port_mode_t mode)
 
     if (!serial_driver_common_initialized)
     {
-        return SERIAL_DESCRIPTOR_INVALID;
+        if (serial_driver_common_init() != SERIAL_DRIVER_OK) /* LCOV_EXCL_BR_LINE */
+        {
+            return SERIAL_DESCRIPTOR_INVALID; /* LCOV_EXCL_LINE */
+        }
     }
 
     if ((size_t)port >= UART_DEVICE_COUNT)
@@ -136,17 +20,12 @@ serial_descriptor_t serial_port_init(serial_ports_t port, uart_port_mode_t mode)
         return SERIAL_DESCRIPTOR_INVALID;
     }
 
-    if (port < SERIAL_PORT_0 || port >= UART_DEVICE_COUNT)
-    {
-        return SERIAL_DRIVER_ERROR_INVALID_PORT;
-    }
-
-    uart_device = &uart_devices[(size_t)port];
-
     if (mode != UART_PORT_MODE_SERIAL && mode != UART_PORT_MODE_DISCRETE)
     {
         return SERIAL_DESCRIPTOR_INVALID;
     }
+
+    uart_device = &uart_devices[(size_t)port];
 
     for (index = 0U; index < UART_DEVICE_COUNT; ++index)
     {
@@ -163,11 +42,12 @@ serial_descriptor_t serial_port_init(serial_ports_t port, uart_port_mode_t mode)
         return SERIAL_DESCRIPTOR_INVALID;
     }
 
-    for (index = 0U; index < UART_DEVICE_COUNT; ++index)
+    for (index = 0U; index < UART_DEVICE_COUNT; ++index) /* LCOV_EXCL_BR_LINE */
     {
         if (!serial_descriptor_map[index].initialized)
         {
             serial_descriptor_map[index].uart_device = uart_device;
+            serial_descriptor_map[index].port_index = (uint32_t)port;
             serial_descriptor_map[index].mode = mode;
             serial_descriptor_map[index].tx_input_staged_word = 0U;
             serial_descriptor_map[index].tx_input_staged_word_bytes = 0U;
@@ -181,8 +61,14 @@ serial_descriptor_t serial_port_init(serial_ports_t port, uart_port_mode_t mode)
 
             if (mode == UART_PORT_MODE_SERIAL)
             {
-                (void)serial_queue_init(&uart_device->tx_queue);
-                (void)serial_queue_init(&uart_device->rx_queue);
+                if (serial_queue_init(&uart_device->tx_queue) != /* LCOV_EXCL_BR_LINE */
+                        UART_ERROR_NONE || /* LCOV_EXCL_BR_LINE */
+                    serial_queue_init(&uart_device->rx_queue) != /* LCOV_EXCL_BR_LINE */
+                        UART_ERROR_NONE)
+                {
+                    serial_descriptor_map[index].initialized = false; /* LCOV_EXCL_LINE */
+                    return SERIAL_DESCRIPTOR_INVALID;                  /* LCOV_EXCL_LINE */
+                }
             }
 
             uart_device->port_mode = mode;
@@ -191,23 +77,257 @@ serial_descriptor_t serial_port_init(serial_ports_t port, uart_port_mode_t mode)
         }
     }
 
-    return SERIAL_DESCRIPTOR_INVALID;
+    return SERIAL_DESCRIPTOR_INVALID; /* LCOV_EXCL_LINE */
 }
 
-uart_device_t *serial_driver_get_uart_device(serial_descriptor_t descriptor)
+serial_driver_error_t serial_driver_write(serial_descriptor_t descriptor,
+                                          const uint8_t *data, size_t length,
+                                          size_t *out_bytes_written)
 {
     serial_descriptor_entry_t *entry = NULL;
+    size_t bytes_written = 0U;
+    uart_error_t queue_error = UART_ERROR_NONE;
+    serial_driver_error_t status = SERIAL_DRIVER_OK;
 
-    if (!serial_driver_common_initialized)
+    if (out_bytes_written == NULL)
     {
-        return NULL;
+        return SERIAL_DRIVER_ERROR_INVALID_ARG;
+    }
+    *out_bytes_written = 0U;
+
+    if (length > 0U && data == NULL)
+    {
+        return SERIAL_DRIVER_ERROR_INVALID_ARG;
     }
 
-    entry = serial_driver_get_entry(descriptor);
-    if (entry == NULL)
+    status =
+        serial_driver_get_mode_entry(descriptor, UART_PORT_MODE_SERIAL, &entry);
+    if (status != SERIAL_DRIVER_OK)
     {
-        return NULL;
+        return status;
     }
 
-    return entry->uart_device;
+    while (bytes_written < length)
+    {
+        if (entry->tx_input_staged_word_bytes == sizeof(uint32_t))
+        {
+            queue_error = serial_queue_push(&entry->uart_device->tx_queue,
+                                            entry->tx_input_staged_word);
+            if (queue_error == UART_ERROR_FIFO_QUEUE_FULL)
+            {
+                break;
+            }
+            if (queue_error != UART_ERROR_NONE)
+            {
+                return SERIAL_DRIVER_ERROR_NOT_INITIALIZED;
+            }
+
+            entry->tx_input_staged_word = 0U;
+            entry->tx_input_staged_word_bytes = 0U;
+            continue;
+        }
+
+        entry->tx_input_staged_word |=
+            ((uint32_t)data[bytes_written])
+            << (8U * entry->tx_input_staged_word_bytes);
+        entry->tx_input_staged_word_bytes += 1U;
+        bytes_written += 1U;
+    }
+
+    if (entry->tx_input_staged_word_bytes == sizeof(uint32_t))
+    {
+        queue_error = serial_queue_push(&entry->uart_device->tx_queue,
+                                        entry->tx_input_staged_word);
+        if (queue_error == UART_ERROR_NONE)
+        {
+            entry->tx_input_staged_word = 0U;
+            entry->tx_input_staged_word_bytes = 0U;
+        }
+        else if (queue_error == UART_ERROR_FIFO_QUEUE_FULL)
+        {
+            if (bytes_written < length)
+            {
+                *out_bytes_written = bytes_written;
+                return SERIAL_DRIVER_ERROR_TX_FULL;
+            }
+        }
+        else
+        {
+            return SERIAL_DRIVER_ERROR_NOT_INITIALIZED;
+        }
+    }
+
+    *out_bytes_written = bytes_written;
+
+    return (bytes_written == length) ? SERIAL_DRIVER_OK
+                                     : SERIAL_DRIVER_ERROR_TX_FULL; /* LCOV_EXCL_BR_LINE */
+}
+
+serial_driver_error_t serial_driver_read(serial_descriptor_t descriptor,
+                                         uint8_t *data, size_t length,
+                                         size_t *out_bytes_read)
+{
+    serial_descriptor_entry_t *entry = NULL;
+    size_t bytes_read = 0U;
+    uint32_t word = 0U;
+    uart_error_t queue_error = UART_ERROR_NONE;
+    serial_driver_error_t status = SERIAL_DRIVER_OK;
+
+    if (out_bytes_read == NULL)
+    {
+        return SERIAL_DRIVER_ERROR_INVALID_ARG;
+    }
+    *out_bytes_read = 0U;
+
+    if (length > 0U && data == NULL)
+    {
+        return SERIAL_DRIVER_ERROR_INVALID_ARG;
+    }
+
+    status =
+        serial_driver_get_mode_entry(descriptor, UART_PORT_MODE_SERIAL, &entry);
+    if (status != SERIAL_DRIVER_OK)
+    {
+        return status;
+    }
+
+    while (bytes_read < length)
+    {
+        if (entry->rx_output_staged_word_bytes > 0U)
+        {
+            data[bytes_read] = (uint8_t)(entry->rx_output_staged_word & 0xFFU);
+            entry->rx_output_staged_word >>= 8U;
+            entry->rx_output_staged_word_bytes -= 1U;
+            bytes_read += 1U;
+            continue;
+        }
+
+        queue_error = serial_queue_pop(&entry->uart_device->rx_queue, &word);
+        if (queue_error == UART_ERROR_NONE)
+        {
+            entry->rx_output_staged_word = word;
+            entry->rx_output_staged_word_bytes = sizeof(uint32_t);
+            continue;
+        }
+
+        if (queue_error == UART_ERROR_FIFO_QUEUE_EMPTY)
+        {
+            if (entry->rx_staged_word_bytes > 0U)
+            {
+                data[bytes_read] = (uint8_t)(entry->rx_staged_word & 0xFFU);
+                entry->rx_staged_word >>= 8U;
+                entry->rx_staged_word_bytes -= 1U;
+                bytes_read += 1U;
+                continue;
+            }
+            break;
+        }
+
+        return SERIAL_DRIVER_ERROR_NOT_INITIALIZED;
+    }
+
+    *out_bytes_read = bytes_read;
+    if (bytes_read == 0U && length > 0U)
+    {
+        return SERIAL_DRIVER_ERROR_RX_EMPTY;
+    }
+
+    return SERIAL_DRIVER_OK;
+}
+
+serial_driver_error_t serial_driver_poll(serial_descriptor_t descriptor,
+                                         size_t max_tx_bytes,
+                                         size_t max_rx_bytes,
+                                         size_t *out_tx_bytes_transmitted,
+                                         size_t *out_rx_bytes_received)
+{
+    serial_descriptor_entry_t *entry = NULL;
+    serial_driver_error_t status = SERIAL_DRIVER_OK;
+
+    if (out_tx_bytes_transmitted == NULL || out_rx_bytes_received == NULL)
+    {
+        return SERIAL_DRIVER_ERROR_INVALID_ARG;
+    }
+
+    *out_tx_bytes_transmitted = 0U;
+    *out_rx_bytes_received = 0U;
+
+    status =
+        serial_driver_get_mode_entry(descriptor, UART_PORT_MODE_SERIAL, &entry);
+    if (status != SERIAL_DRIVER_OK)
+    {
+        return status;
+    }
+
+    status = serial_driver_transmit_to_device_fifo(entry, max_tx_bytes,
+                                                   out_tx_bytes_transmitted);
+    if (status != SERIAL_DRIVER_OK)
+    {
+        return status;
+    }
+
+    if (entry->staged_word_bytes != 0U ||
+        entry->tx_input_staged_word_bytes != 0U || /* LCOV_EXCL_BR_LINE */
+        serial_queue_size(&entry->uart_device->tx_queue) != 0U)
+    {
+        return SERIAL_DRIVER_OK;
+    }
+
+    return serial_driver_receive_from_device_fifo(entry, max_rx_bytes,
+                                                  out_rx_bytes_received);
+}
+
+static serial_driver_error_t
+serial_driver_set_mcr_bit(serial_descriptor_t descriptor, uart_port_mode_t mode,
+                          uint8_t bit_mask, bool enable)
+{
+    serial_descriptor_entry_t *entry = NULL;
+    volatile uint8_t *mcr = NULL;
+    serial_driver_error_t status = SERIAL_DRIVER_OK;
+
+    status = serial_driver_get_mode_entry(descriptor, mode, &entry);
+    if (status != SERIAL_DRIVER_OK)
+    {
+        return status;
+    }
+
+    mcr = &entry->uart_device->registers->uart.mcr;
+    if (enable)
+    {
+        *mcr |= bit_mask;
+    }
+    else
+    {
+        *mcr &= (uint8_t)(~bit_mask);
+    }
+
+    return SERIAL_DRIVER_OK;
+}
+
+serial_driver_error_t
+serial_driver_enable_loopback(serial_descriptor_t descriptor)
+{
+    return serial_driver_set_mcr_bit(descriptor, UART_PORT_MODE_SERIAL,
+                                     UART_MCR_LOOPBACK_BIT, true);
+}
+
+serial_driver_error_t
+serial_driver_disable_loopback(serial_descriptor_t descriptor)
+{
+    return serial_driver_set_mcr_bit(descriptor, UART_PORT_MODE_SERIAL,
+                                     UART_MCR_LOOPBACK_BIT, false);
+}
+
+serial_driver_error_t
+serial_driver_enable_discrete(serial_descriptor_t descriptor)
+{
+    return serial_driver_set_mcr_bit(descriptor, UART_PORT_MODE_DISCRETE,
+                                     UART_MCR_DISCRETE_LINE_BIT, true);
+}
+
+serial_driver_error_t
+serial_driver_disable_discrete(serial_descriptor_t descriptor)
+{
+    return serial_driver_set_mcr_bit(descriptor, UART_PORT_MODE_DISCRETE,
+                                     UART_MCR_DISCRETE_LINE_BIT, false);
 }

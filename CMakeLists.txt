@@ -13,6 +13,20 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Backward-compatible cache aliases for legacy option names.
+if(DEFINED SERIAL_DRIVER_BUILD_TESTS AND NOT DEFINED DEVICE_DRIVER_BUILD_TESTS)
+    set(DEVICE_DRIVER_BUILD_TESTS "${SERIAL_DRIVER_BUILD_TESTS}" CACHE BOOL "Build unit tests")
+    message(DEPRECATION "SERIAL_DRIVER_BUILD_TESTS is deprecated; use DEVICE_DRIVER_BUILD_TESTS.")
+endif()
+if(DEFINED SERIAL_DRIVER_BUILD_DOCS AND NOT DEFINED DEVICE_DRIVER_BUILD_DOCS)
+    set(DEVICE_DRIVER_BUILD_DOCS "${SERIAL_DRIVER_BUILD_DOCS}" CACHE BOOL "Generate API documentation with Doxygen")
+    message(DEPRECATION "SERIAL_DRIVER_BUILD_DOCS is deprecated; use DEVICE_DRIVER_BUILD_DOCS.")
+endif()
+if(DEFINED SERIAL_DRIVER_ENABLE_COVERAGE AND NOT DEFINED DEVICE_DRIVER_ENABLE_COVERAGE)
+    set(DEVICE_DRIVER_ENABLE_COVERAGE "${SERIAL_DRIVER_ENABLE_COVERAGE}" CACHE BOOL "Enable code coverage instrumentation (GCC/Clang only)")
+    message(DEPRECATION "SERIAL_DRIVER_ENABLE_COVERAGE is deprecated; use DEVICE_DRIVER_ENABLE_COVERAGE.")
+endif()
+
 option(DEVICE_DRIVER_BUILD_TESTS "Build unit tests" ON)
 option(DEVICE_DRIVER_BUILD_DOCS "Generate API documentation with Doxygen" ON)
 option(DEVICE_DRIVER_ENABLE_COVERAGE "Enable code coverage instrumentation (GCC/Clang only)" OFF)
@@ -31,8 +45,6 @@ endif()
 
 add_library(device_driver
     src/device_driver.c
-    src/device_driver_tx.c
-    src/device_driver_rx.c
     src/hw_abstraction.c
     src/registers.c
     src/queue.c
@@ -76,11 +88,36 @@ if(DEVICE_DRIVER_BUILD_TESTS)
     include(FetchContent)
 
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-    FetchContent_Declare(
-        googletest
-        URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.zip
-        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-    )
+    set(DEVICE_DRIVER_LOCAL_GTEST_SOURCE "" CACHE PATH
+        "Optional path to a local GoogleTest source tree (used instead of downloading)")
+
+    set(_device_driver_gtest_source "")
+    if(DEVICE_DRIVER_LOCAL_GTEST_SOURCE)
+        if(EXISTS "${DEVICE_DRIVER_LOCAL_GTEST_SOURCE}/CMakeLists.txt")
+            set(_device_driver_gtest_source "${DEVICE_DRIVER_LOCAL_GTEST_SOURCE}")
+        else()
+            message(FATAL_ERROR
+                "DEVICE_DRIVER_LOCAL_GTEST_SOURCE is set but does not contain CMakeLists.txt: "
+                "${DEVICE_DRIVER_LOCAL_GTEST_SOURCE}")
+        endif()
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/build/_deps/googletest-src/CMakeLists.txt")
+        # Reuse an existing local cache when available to support offline configure.
+        set(_device_driver_gtest_source "${CMAKE_CURRENT_SOURCE_DIR}/build/_deps/googletest-src")
+    endif()
+
+    if(_device_driver_gtest_source)
+        message(STATUS "Using local GoogleTest source: ${_device_driver_gtest_source}")
+        FetchContent_Declare(
+            googletest
+            SOURCE_DIR "${_device_driver_gtest_source}"
+        )
+    else()
+        FetchContent_Declare(
+            googletest
+            URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.zip
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+        )
+    endif()
     FetchContent_MakeAvailable(googletest)
 
     enable_testing()
@@ -96,8 +133,20 @@ if(DEVICE_DRIVER_BUILD_TESTS)
             GTest::gtest_main
     )
 
+    add_executable(device_driver_coverage_tests
+        tests/test_device_driver_coverage.cpp
+        tests/test_device_driver_internal.cpp
+    )
+
+    target_link_libraries(device_driver_coverage_tests
+        PRIVATE
+            device_driver::device_driver
+            GTest::gtest_main
+    )
+
     include(GoogleTest)
     gtest_discover_tests(device_driver_tests)
+    gtest_discover_tests(device_driver_coverage_tests)
 
     if(DEVICE_DRIVER_ENABLE_COVERAGE)
         find_program(GCOVR_EXECUTABLE gcovr)
@@ -123,8 +172,9 @@ if(DEVICE_DRIVER_BUILD_TESTS)
                 --print-summary
                 --xml-pretty --output coverage.xml
                 --html-details coverage.html
+                ${CMAKE_CURRENT_BINARY_DIR}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-            DEPENDS device_driver_tests
+            DEPENDS device_driver_tests device_driver_coverage_tests
             COMMENT "Running tests and generating coverage reports"
             VERBATIM
         )
