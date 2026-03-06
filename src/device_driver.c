@@ -7,12 +7,10 @@ serial_descriptor_t serial_port_init(serial_ports_t port, uart_port_mode_t mode)
     uart_device_t *uart_device = NULL;
     uart_error_t hw_map_error = UART_ERROR_NONE;
 
-    if (!serial_driver_common_initialized)
+    if (!serial_driver_common_initialized &&
+        serial_driver_common_init() != SERIAL_DRIVER_OK) /* LCOV_EXCL_BR_LINE */
     {
-        if (serial_driver_common_init() != SERIAL_DRIVER_OK) /* LCOV_EXCL_BR_LINE */
-        {
-            return SERIAL_DESCRIPTOR_INVALID; /* LCOV_EXCL_LINE */
-        }
+        return SERIAL_DESCRIPTOR_INVALID; /* LCOV_EXCL_LINE */
     }
 
     if ((size_t)port >= UART_DEVICE_COUNT)
@@ -59,16 +57,17 @@ serial_descriptor_t serial_port_init(serial_ports_t port, uart_port_mode_t mode)
             serial_descriptor_map[index].rx_output_staged_word_bytes = 0U;
             serial_descriptor_map[index].initialized = true;
 
-            if (mode == UART_PORT_MODE_SERIAL)
+            if (mode == UART_PORT_MODE_SERIAL &&
+                (serial_queue_init(
+                        &uart_device->tx_queue) != /* LCOV_EXCL_BR_LINE */
+                        UART_ERROR_NONE ||         /* LCOV_EXCL_BR_LINE */
+                    serial_queue_init(
+                        &uart_device->rx_queue) != /* LCOV_EXCL_BR_LINE */
+                        UART_ERROR_NONE))
             {
-                if (serial_queue_init(&uart_device->tx_queue) != /* LCOV_EXCL_BR_LINE */
-                        UART_ERROR_NONE || /* LCOV_EXCL_BR_LINE */
-                    serial_queue_init(&uart_device->rx_queue) != /* LCOV_EXCL_BR_LINE */
-                        UART_ERROR_NONE)
-                {
-                    serial_descriptor_map[index].initialized = false; /* LCOV_EXCL_LINE */
-                    return SERIAL_DESCRIPTOR_INVALID;                  /* LCOV_EXCL_LINE */
-                }
+                serial_descriptor_map[index].initialized =
+                    false;                        /* LCOV_EXCL_LINE */
+                return SERIAL_DESCRIPTOR_INVALID; /* LCOV_EXCL_LINE */
             }
 
             uart_device->port_mode = mode;
@@ -159,8 +158,9 @@ serial_driver_error_t serial_driver_write(serial_descriptor_t descriptor,
 
     *out_bytes_written = bytes_written;
 
-    return (bytes_written == length) ? SERIAL_DRIVER_OK
-                                     : SERIAL_DRIVER_ERROR_TX_FULL; /* LCOV_EXCL_BR_LINE */
+    return (bytes_written == length)
+               ? SERIAL_DRIVER_OK
+               : SERIAL_DRIVER_ERROR_TX_FULL; /* LCOV_EXCL_BR_LINE */
 }
 
 serial_driver_error_t serial_driver_read(serial_descriptor_t descriptor,

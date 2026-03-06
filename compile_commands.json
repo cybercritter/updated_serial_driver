@@ -1,44 +1,80 @@
 [
 {
-  "directory": "/home/mreid/projects/updated_serial_driver/build",
-  "command": "/usr/bin/cc  -I/home/mreid/projects/updated_serial_driver/include -std=c11 -o CMakeFiles/serial_driver.dir/src/serial_driver.c.o -c /home/mreid/projects/updated_serial_driver/src/serial_driver.c",
-  "file": "/home/mreid/projects/updated_serial_driver/src/serial_driver.c",
-  "output": "CMakeFiles/serial_driver.dir/src/serial_driver.c.o"
+  "directory": "/media/sky/shared/projects/updated_device_driver/build",
+  "command": "/usr/bin/clang -I/media/sky/shared/projects/updated_device_driver/include -g -std=c99 -o CMakeFiles/device_driver.dir/src/device_driver.c.o -c /media/sky/shared/projects/updated_device_driver/src/device_driver.c",
+  "file": "/media/sky/shared/projects/updated_device_driver/src/device_driver.c",
+  "output": "/media/sky/shared/projects/updated_device_driver/build/CMakeFiles/device_driver.dir/src/device_driver.c.o"
 },
 {
-  "directory": "/home/mreid/projects/updated_serial_driver/build",
-  "command": "/usr/bin/cc  -I/home/mreid/projects/updated_serial_driver/include -std=c11 -o CMakeFiles/serial_driver.dir/src/registers.c.o -c /home/mreid/projects/updated_serial_driver/src/registers.c",
-  "file": "/home/mreid/projects/updated_serial_driver/src/registers.c",
-  "output": "CMakeFiles/serial_driver.dir/src/registers.c.o"
+  "directory": "/media/sky/shared/projects/updated_device_driver/build",
+  "command": "/usr/bin/clang -I/media/sky/shared/projects/updated_device_driver/include -g -std=c99 -o CMakeFiles/device_driver.dir/src/hw_abstraction.c.o -c /media/sky/shared/projects/updated_device_driver/src/hw_abstraction.c",
+  "file": "/media/sky/shared/projects/updated_device_driver/src/hw_abstraction.c",
+  "output": "/media/sky/shared/projects/updated_device_driver/build/CMakeFiles/device_driver.dir/src/hw_abstraction.c.o"
 },
 {
-  "directory": "/home/mreid/projects/updated_serial_driver/build",
-  "command": "/usr/bin/c++  -I/home/mreid/projects/updated_serial_driver/include -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/include -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest -std=c++17 -o CMakeFiles/serial_driver_tests.dir/tests/test_serial_driver.cpp.o -c /home/mreid/projects/updated_serial_driver/tests/test_serial_driver.cpp",
-  "file": "/home/mreid/projects/updated_serial_driver/tests/test_serial_driver.cpp",
-  "output": "CMakeFiles/serial_driver_tests.dir/tests/test_serial_driver.cpp.o"
+  "directory": "/media/sky/shared/projects/updated_device_driver/build",
+  "command": "/usr/bin/clang -I/media/sky/shared/projects/updated_device_driver/include -g -std=c99 -o CMakeFiles/device_driver.dir/src/registers.c.o -c /media/sky/shared/projects/updated_device_driver/src/registers.c",
+  "file": "/media/sky/shared/projects/updated_device_driver/src/registers.c",
+  "output": "/media/sky/shared/projects/updated_device_driver/build/CMakeFiles/device_driver.dir/src/registers.c.o"
 },
 {
-  "directory": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-build/googlemock",
-  "command": "/usr/bin/c++  -I/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock/include -I/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/include -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest -std=c++17 -Wall -Wshadow -Wundef -Wno-error=dangling-else -DGTEST_HAS_PTHREAD=1 -fexceptions -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -o CMakeFiles/gmock.dir/src/gmock-all.cc.o -c /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock/src/gmock-all.cc",
-  "file": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock/src/gmock-all.cc",
-  "output": "_deps/googletest-build/googlemock/CMakeFiles/gmock.dir/src/gmock-all.cc.o"
+  "directory": "/media/sky/shared/projects/updated_device_driver/build",
+  "command": "/usr/bin/clang -I/media/sky/shared/projects/updated_device_driver/include -g -std=c99 -o CMakeFiles/device_driver.dir/src/queue.c.o -c /media/sky/shared/projects/updated_device_driver/src/queue.c",
+  "file": "/media/sky/shared/projects/updated_device_driver/src/queue.c",
+  "output": "/media/sky/shared/projects/updated_device_driver/build/CMakeFiles/device_driver.dir/src/queue.c.o"
 },
 {
-  "directory": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-build/googlemock",
-  "command": "/usr/bin/c++  -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock/include -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/include -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest -std=c++17 -Wall -Wshadow -Wundef -Wno-error=dangling-else -DGTEST_HAS_PTHREAD=1 -fexceptions -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -o CMakeFiles/gmock_main.dir/src/gmock_main.cc.o -c /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock/src/gmock_main.cc",
-  "file": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googlemock/src/gmock_main.cc",
-  "output": "_deps/googletest-build/googlemock/CMakeFiles/gmock_main.dir/src/gmock_main.cc.o"
+  "directory": "/media/sky/shared/projects/updated_device_driver/build",
+  "command": "/usr/bin/clang++ -I/media/sky/shared/projects/updated_device_driver/include -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest/include -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest -g -std=c++17 -o CMakeFiles/device_driver_tests.dir/tests/test_device_driver.cpp.o -c /media/sky/shared/projects/updated_device_driver/tests/test_device_driver.cpp",
+  "file": "/media/sky/shared/projects/updated_device_driver/tests/test_device_driver.cpp",
+  "output": "/media/sky/shared/projects/updated_device_driver/build/CMakeFiles/device_driver_tests.dir/tests/test_device_driver.cpp.o"
 },
 {
-  "directory": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-build/googletest",
-  "command": "/usr/bin/c++  -I/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/include -I/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest -std=c++17 -Wall -Wshadow -Wundef -Wno-error=dangling-else -DGTEST_HAS_PTHREAD=1 -fexceptions -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -o CMakeFiles/gtest.dir/src/gtest-all.cc.o -c /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/src/gtest-all.cc",
-  "file": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/src/gtest-all.cc",
-  "output": "_deps/googletest-build/googletest/CMakeFiles/gtest.dir/src/gtest-all.cc.o"
+  "directory": "/media/sky/shared/projects/updated_device_driver/build",
+  "command": "/usr/bin/clang++ -I/media/sky/shared/projects/updated_device_driver/include -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest/include -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest -g -std=c++17 -o CMakeFiles/device_driver_tests.dir/tests/test_queue.cpp.o -c /media/sky/shared/projects/updated_device_driver/tests/test_queue.cpp",
+  "file": "/media/sky/shared/projects/updated_device_driver/tests/test_queue.cpp",
+  "output": "/media/sky/shared/projects/updated_device_driver/build/CMakeFiles/device_driver_tests.dir/tests/test_queue.cpp.o"
 },
 {
-  "directory": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-build/googletest",
-  "command": "/usr/bin/c++  -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/include -isystem /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest -std=c++17 -Wall -Wshadow -Wundef -Wno-error=dangling-else -DGTEST_HAS_PTHREAD=1 -fexceptions -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -o CMakeFiles/gtest_main.dir/src/gtest_main.cc.o -c /home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/src/gtest_main.cc",
-  "file": "/home/mreid/projects/updated_serial_driver/build/_deps/googletest-src/googletest/src/gtest_main.cc",
-  "output": "_deps/googletest-build/googletest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o"
+  "directory": "/media/sky/shared/projects/updated_device_driver/build",
+  "command": "/usr/bin/clang++ -I/media/sky/shared/projects/updated_device_driver/include -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest/include -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest -g -std=c++17 -o CMakeFiles/device_driver_coverage_tests.dir/tests/test_device_driver_coverage.cpp.o -c /media/sky/shared/projects/updated_device_driver/tests/test_device_driver_coverage.cpp",
+  "file": "/media/sky/shared/projects/updated_device_driver/tests/test_device_driver_coverage.cpp",
+  "output": "/media/sky/shared/projects/updated_device_driver/build/CMakeFiles/device_driver_coverage_tests.dir/tests/test_device_driver_coverage.cpp.o"
+},
+{
+  "directory": "/media/sky/shared/projects/updated_device_driver/build",
+  "command": "/usr/bin/clang++ -I/media/sky/shared/projects/updated_device_driver/include -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest/include -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest -g -std=c++17 -o CMakeFiles/device_driver_coverage_tests.dir/tests/test_device_driver_internal.cpp.o -c /media/sky/shared/projects/updated_device_driver/tests/test_device_driver_internal.cpp",
+  "file": "/media/sky/shared/projects/updated_device_driver/tests/test_device_driver_internal.cpp",
+  "output": "/media/sky/shared/projects/updated_device_driver/build/CMakeFiles/device_driver_coverage_tests.dir/tests/test_device_driver_internal.cpp.o"
+},
+{
+  "directory": "/media/sky/shared/projects/updated_device_driver/build",
+  "command": "/usr/bin/clang -I/media/sky/shared/projects/updated_device_driver/include -g -std=c99 -o CMakeFiles/device_driver_test_main.dir/src/device_driver_test_main.c.o -c /media/sky/shared/projects/updated_device_driver/src/device_driver_test_main.c",
+  "file": "/media/sky/shared/projects/updated_device_driver/src/device_driver_test_main.c",
+  "output": "/media/sky/shared/projects/updated_device_driver/build/CMakeFiles/device_driver_test_main.dir/src/device_driver_test_main.c.o"
+},
+{
+  "directory": "/media/sky/shared/projects/updated_device_driver/build",
+  "command": "/usr/bin/clang++ -I/media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googlemock/include -I/media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googlemock -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest/include -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest -g -std=c++17 -Wall -Wshadow -Wconversion -Wundef -DGTEST_HAS_PTHREAD=1 -fexceptions -W -Wpointer-arith -Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch -Wunused-parameter -Wcast-align -Winline -Wredundant-decls -Wchar-subscripts -o _deps/googletest-build/googlemock/CMakeFiles/gmock.dir/src/gmock-all.cc.o -c /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googlemock/src/gmock-all.cc",
+  "file": "/media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googlemock/src/gmock-all.cc",
+  "output": "/media/sky/shared/projects/updated_device_driver/build/_deps/googletest-build/googlemock/CMakeFiles/gmock.dir/src/gmock-all.cc.o"
+},
+{
+  "directory": "/media/sky/shared/projects/updated_device_driver/build",
+  "command": "/usr/bin/clang++ -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googlemock/include -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googlemock -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest/include -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest -g -std=c++17 -Wall -Wshadow -Wconversion -Wundef -DGTEST_HAS_PTHREAD=1 -fexceptions -W -Wpointer-arith -Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch -Wunused-parameter -Wcast-align -Winline -Wredundant-decls -Wchar-subscripts -o _deps/googletest-build/googlemock/CMakeFiles/gmock_main.dir/src/gmock_main.cc.o -c /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googlemock/src/gmock_main.cc",
+  "file": "/media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googlemock/src/gmock_main.cc",
+  "output": "/media/sky/shared/projects/updated_device_driver/build/_deps/googletest-build/googlemock/CMakeFiles/gmock_main.dir/src/gmock_main.cc.o"
+},
+{
+  "directory": "/media/sky/shared/projects/updated_device_driver/build",
+  "command": "/usr/bin/clang++ -I/media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest/include -I/media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest -g -std=c++17 -Wall -Wshadow -Wconversion -Wundef -DGTEST_HAS_PTHREAD=1 -fexceptions -W -Wpointer-arith -Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch -Wunused-parameter -Wcast-align -Winline -Wredundant-decls -Wchar-subscripts -o _deps/googletest-build/googletest/CMakeFiles/gtest.dir/src/gtest-all.cc.o -c /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest/src/gtest-all.cc",
+  "file": "/media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest/src/gtest-all.cc",
+  "output": "/media/sky/shared/projects/updated_device_driver/build/_deps/googletest-build/googletest/CMakeFiles/gtest.dir/src/gtest-all.cc.o"
+},
+{
+  "directory": "/media/sky/shared/projects/updated_device_driver/build",
+  "command": "/usr/bin/clang++ -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest/include -isystem /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest -g -std=c++17 -Wall -Wshadow -Wconversion -Wundef -DGTEST_HAS_PTHREAD=1 -fexceptions -W -Wpointer-arith -Wreturn-type -Wcast-qual -Wwrite-strings -Wswitch -Wunused-parameter -Wcast-align -Winline -Wredundant-decls -Wchar-subscripts -o _deps/googletest-build/googletest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o -c /media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest/src/gtest_main.cc",
+  "file": "/media/sky/shared/projects/updated_device_driver/build/_deps/googletest-src/googletest/src/gtest_main.cc",
+  "output": "/media/sky/shared/projects/updated_device_driver/build/_deps/googletest-build/googletest/CMakeFiles/gtest_main.dir/src/gtest_main.cc.o"
 }
 ]

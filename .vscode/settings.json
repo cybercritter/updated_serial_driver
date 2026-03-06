@@ -22,7 +22,15 @@
       }
     ]
   },
-  "cSpell.words": ["CPACK", "CTEST", "Doxyfile", "gcda", "gcov", "GCOVR"],
+  "cSpell.words": [
+    "CPACK",
+    "CTEST",
+    "Doxyfile",
+    "gcda",
+    "gcov",
+    "GCOVR",
+    "STREQ"
+  ],
   "sonarlint.connectedMode.project": {
     "connectionId": "cybercritter",
     "projectKey": "cybercritter_updated_serial_driver"

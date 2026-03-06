@@ -10,7 +10,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "device_driver/errors.h"
 #include "device_driver/queue.h"
 #include "device_driver/register_map.h"
 

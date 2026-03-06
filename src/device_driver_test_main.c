@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "device_driver/device_driver.h"
+#include "device_driver/hw_abstraction.h"
 
 #define TEST_PORT_SERIAL SERIAL_PORT_6
 #define TEST_PORT_DISCRETE SERIAL_PORT_7
@@ -11,42 +12,35 @@
 static xr17c358_channel_register_map_t g_mock_registers[UART_DEVICE_COUNT];
 
 static uart_error_t map_mock_uart_registers(size_t port_index,
-                                            uart_device_t *uart_device,
-                                            void *context)
+                                            uart_device_t *uart_device)
 {
-    xr17c358_channel_register_map_t *register_blocks =
-        (xr17c358_channel_register_map_t *)context;
-
-    if (uart_device == NULL || register_blocks == NULL ||
-        port_index >= UART_DEVICE_COUNT)
+    if (uart_device == NULL || port_index >= UART_DEVICE_COUNT)
     {
         return UART_ERROR_INVALID_ARG;
     }
 
-    uart_device->registers = &register_blocks[port_index];
+    uart_device->registers = &g_mock_registers[port_index];
     uart_device->device_name = "mock-uart";
-    uart_device->uart_base_address = (uintptr_t)&register_blocks[port_index];
+    uart_device->uart_base_address = (uintptr_t)&g_mock_registers[port_index];
 
     return UART_ERROR_NONE;
 }
 
 static int configure_mock_uart_registers(void)
 {
-    size_t i = 0U;
-
-    for (i = 0U; i < UART_DEVICE_COUNT; ++i)
+    for (size_t i = 0; i < UART_DEVICE_COUNT; ++i)
     {
         memset(&g_mock_registers[i], 0, sizeof(g_mock_registers[i]));
-        uart_fifo_map.write_fifos[i].head = 0U;
-        uart_fifo_map.write_fifos[i].tail = 0U;
-        uart_fifo_map.write_fifos[i].count = 0U;
-        uart_fifo_map.read_fifos[i].head = 0U;
-        uart_fifo_map.read_fifos[i].tail = 0U;
-        uart_fifo_map.read_fifos[i].count = 0U;
+        uart_fifo_map.write_fifos[i].head = 0;
+        uart_fifo_map.write_fifos[i].tail = 0;
+        uart_fifo_map.write_fifos[i].count = 0;
+        uart_fifo_map.read_fifos[i].head = 0;
+        uart_fifo_map.read_fifos[i].tail = 0;
+        uart_fifo_map.read_fifos[i].count = 0;
     }
 
-    return serial_driver_hw_set_mapper(map_mock_uart_registers,
-                                       g_mock_registers) == UART_ERROR_NONE
+    return serial_driver_hw_set_mapper(map_mock_uart_registers) ==
+                   UART_ERROR_NONE
                ? 0
                : 1;
 }
@@ -86,7 +80,8 @@ static int run_port6_serial_roundtrip(void)
     size_t bytes_received = 0U;
     size_t bytes_read = 0U;
 
-    serial_descriptor = serial_port_init(TEST_PORT_SERIAL, UART_PORT_MODE_SERIAL);
+    serial_descriptor =
+        serial_port_init(TEST_PORT_SERIAL, UART_PORT_MODE_SERIAL);
     if (serial_descriptor == SERIAL_DESCRIPTOR_INVALID)
     {
         fprintf(stderr, "Failed to register serial port.\n");

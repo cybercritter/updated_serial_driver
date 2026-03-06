@@ -1,26 +1,24 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <gtest/gtest.h>
 
 extern "C"
 {
 #include "device_driver/device_driver.h"
+#include "device_driver/hw_abstraction.h"
 
-uart_error_t serial_driver_hw_map_uart(size_t port_index,
-                                       uart_device_t *uart_device);
+    uart_error_t serial_driver_hw_map_uart(size_t port_index,
+                                           uart_device_t *uart_device);
 }
-
-#include <gtest/gtest.h>
 
 namespace
 {
 
-xr17c358_channel_register_map_t g_registers[UART_DEVICE_COUNT];
+xr17c358_channel_register_map_t g_registers[UART_DEVICE_COUNT]{};
 
-uart_error_t CoverageMapper(size_t port_index, uart_device_t *uart_device,
-                            void *context)
+uart_error_t CoverageMapper(size_t port_index, uart_device_t *uart_device)
 {
-    (void)context;
 
     if (uart_device == nullptr || port_index >= UART_DEVICE_COUNT)
     {
@@ -35,19 +33,15 @@ uart_error_t CoverageMapper(size_t port_index, uart_device_t *uart_device,
     return UART_ERROR_NONE;
 }
 
-uart_error_t FailingMapper(size_t port_index, uart_device_t *uart_device,
-                           void *context)
+uart_error_t FailingMapper(size_t port_index, uart_device_t *uart_device)
 {
     (void)port_index;
     (void)uart_device;
-    (void)context;
     return UART_ERROR_DEVICE_NOT_FOUND;
 }
 
-uart_error_t NoRegistersMapper(size_t port_index, uart_device_t *uart_device,
-                               void *context)
+uart_error_t NoRegistersMapper(size_t port_index, uart_device_t *uart_device)
 {
-    (void)context;
     if (uart_device == nullptr || port_index >= UART_DEVICE_COUNT)
     {
         return UART_ERROR_INVALID_ARG;
@@ -86,8 +80,7 @@ void PushReadByte(size_t port_index, uint8_t value)
 
 TEST(SerialDriverCoverageApiTest, ExerciseCoverageBranches)
 {
-    ASSERT_EQ(serial_driver_hw_set_mapper(CoverageMapper, nullptr),
-              UART_ERROR_NONE);
+    ASSERT_EQ(serial_driver_hw_set_mapper(CoverageMapper), UART_ERROR_NONE);
 
     const serial_descriptor_t descriptor0 =
         serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL);
@@ -95,18 +88,15 @@ TEST(SerialDriverCoverageApiTest, ExerciseCoverageBranches)
     EXPECT_EQ(serial_port_init(SERIAL_PORT_0, UART_PORT_MODE_SERIAL),
               descriptor0);
 
-    ASSERT_EQ(serial_driver_hw_set_mapper(FailingMapper, nullptr),
-              UART_ERROR_NONE);
+    ASSERT_EQ(serial_driver_hw_set_mapper(FailingMapper), UART_ERROR_NONE);
     EXPECT_EQ(serial_port_init(SERIAL_PORT_1, UART_PORT_MODE_SERIAL),
               SERIAL_DESCRIPTOR_INVALID);
 
-    ASSERT_EQ(serial_driver_hw_set_mapper(NoRegistersMapper, nullptr),
-              UART_ERROR_NONE);
+    ASSERT_EQ(serial_driver_hw_set_mapper(NoRegistersMapper), UART_ERROR_NONE);
     EXPECT_EQ(serial_port_init(SERIAL_PORT_2, UART_PORT_MODE_SERIAL),
               SERIAL_DESCRIPTOR_INVALID);
 
-    ASSERT_EQ(serial_driver_hw_set_mapper(CoverageMapper, nullptr),
-              UART_ERROR_NONE);
+    ASSERT_EQ(serial_driver_hw_set_mapper(CoverageMapper), UART_ERROR_NONE);
 
     const serial_descriptor_t descriptor3 =
         serial_port_init(SERIAL_PORT_3, UART_PORT_MODE_SERIAL);
@@ -204,8 +194,7 @@ TEST(SerialDriverCoverageApiTest, ExerciseCoverageBranches)
 
     serial_driver_hw_reset_mapper();
 
-    EXPECT_EQ(serial_driver_hw_set_mapper(nullptr, nullptr),
-              UART_ERROR_INVALID_ARG);
+    EXPECT_EQ(serial_driver_hw_set_mapper(nullptr), UART_ERROR_INVALID_ARG);
 
     uart_device_t device = {};
     EXPECT_EQ(serial_driver_hw_map_uart(UART_DEVICE_COUNT, &device),
