@@ -438,9 +438,6 @@ typedef struct XR17V358DeviceConfigurationRegisters
 
 } xr17v358_device_config_registers_t;
 
-typedef XR17V358DeviceConfigurationGenericRegisters_t
-    xr17c358_device_config_registers_t;
-
 /**
  * @brief XR17V358 direct FIFO window (offset 0x100-0x1FF).
  *
