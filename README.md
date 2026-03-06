@@ -1,13 +1,11 @@
+# updated_device_driver
+
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=cybercritter_updated_serial_driver&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=cybercritter_updated_serial_driver)
 [![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=cybercritter_updated_serial_driver&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=cybercritter_updated_serial_driver)
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=cybercritter_updated_serial_driver&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=cybercritter_updated_serial_driver)
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=cybercritter_updated_serial_driver&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=cybercritter_updated_serial_driver)
 [![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=cybercritter_updated_serial_driver&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=cybercritter_updated_serial_driver)
-
-
 [![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=cybercritter_updated_serial_driver&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=cybercritter_updated_serial_driver)
-
-# updated_device_driver
 
 16550 / XR17C358-style UART driver in C with CMake-based builds and GoogleTest
 unit tests.
@@ -19,7 +17,7 @@ This repository provides:
 - A descriptor-based serial driver API for up to 8 UART ports.
 - Poll-driven TX/RX data movement between software queues and per-port byte
   FIFOs.
-- Serial-mode controls (local loopback) and discrete-mode control (#RTS line).
+- Serial-mode controls (local loopback) and discrete-mode control (RTS line).
 - A pluggable hardware mapper callback for binding UART device slots to
   platform register blocks.
 
@@ -40,7 +38,7 @@ This repository provides:
 - `include/device_driver/errors.h`: shared UART-level error codes.
 - `tests/test_device_driver.cpp`: GoogleTest coverage for serial/discrete APIs.
 - `tests/test_queue.cpp`: GoogleTest coverage for queue utilities.
-- `tests/device_driver_test_main.c`: C-only executable smoke test.
+- `src/device_driver_test_main.c`: C-only executable smoke test.
 
 ## Build requirements
 
@@ -104,6 +102,8 @@ Core serial driver API (`include/device_driver/device_driver.h`):
 
 - `serial_port_init(...)`
 - `serial_driver_write(...)`
+- `serial_driver_escape_encode(...)`
+- `serial_driver_escape_decode(...)`
 - `serial_driver_read(...)`
 - `serial_driver_poll(...)`
 - `serial_driver_enable_loopback(...)`
@@ -141,7 +141,12 @@ Register and device model headers:
   there is no pending TX staged data or queued TX data.
 - TX/RX queues are word-based (`uint32_t`) with byte staging to preserve byte
   ordering across API boundaries.
+- Optional frame helpers `serial_driver_escape_encode()` and
+  `serial_driver_escape_decode()` provide byte-stuffing with frame delimiter
+  `0x7E` and escape byte `0x7D`.
 - Serial/discrete mode gating is enforced per descriptor.
+- Internal staging and descriptor bookkeeping helpers are documented in
+  `include/device_driver/device_driver_internal.h`.
 
 ## Example usage
 

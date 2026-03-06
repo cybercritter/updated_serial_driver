@@ -27,7 +27,7 @@
 
 /** MCR bit 0: DTR output control. */
 #define UART_MCR_DTR_BIT (1U << 0U)
-/** MCR bit 1: RTS output control (#RTS line). */
+/** MCR bit 1: RTS output control (RTS line). */
 #define UART_MCR_RTS_BIT (1U << 1U)
 /** MCR bit 2: OUT1 output control. */
 #define UART_MCR_OUT1_BIT (1U << 2U)
@@ -39,7 +39,7 @@
 /**
  * @brief Discrete line control bit for XR17C358/XR17V358 channels.
  *
- * In discrete mode the driver uses the per-channel #RTS output.
+ * In discrete mode the driver uses the per-channel RTS output.
  */
 #define UART_MCR_DISCRETE_LINE_BIT UART_MCR_RTS_BIT
 

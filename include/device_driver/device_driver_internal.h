@@ -1,5 +1,14 @@
 #ifndef SERIAL_DRIVER_INTERNAL_H
 #define SERIAL_DRIVER_INTERNAL_H
+
+/**
+ * @file device_driver_internal.h
+ * @brief Internal-only helpers shared by the driver implementation.
+ *
+ * This header intentionally defines static helpers used by
+ * `src/device_driver.c`. It is not part of the public driver API.
+ */
+
 #include "device_driver/device_driver.h"
 
 #ifdef __cplusplus
@@ -10,29 +19,50 @@ extern "C"
      * Internal helpers were intentionally removed from the exported interface.
      * Use the public API in device_driver.h.
      */
+    /**
+     * @brief Runtime state tracked per active serial descriptor.
+     *
+     * TX and RX bytes are staged into 32-bit words in little-endian byte order
+     * to match the fixed-word software queues.
+     */
     typedef struct SerialDescriptorEntry
     {
+        /** Bound UART slot for this descriptor. */
         uart_device_t *uart_device;
+        /** Index into @ref uart_devices and @ref uart_fifo_map. */
         uint32_t port_index;
+        /** Mode requested during descriptor initialization. */
         uart_port_mode_t mode;
+        /** Partial TX word being filled by @ref serial_driver_write. */
         uint32_t tx_input_staged_word;
+        /** Number of valid bytes in @ref tx_input_staged_word. */
         size_t tx_input_staged_word_bytes;
+        /** Word currently being drained to the device TX FIFO. */
         uint32_t staged_word;
+        /** Remaining bytes in @ref staged_word. */
         size_t staged_word_bytes;
+        /** Partial RX word currently filled from the device RX FIFO. */
         uint32_t rx_staged_word;
+        /** Number of valid bytes in @ref rx_staged_word. */
         size_t rx_staged_word_bytes;
+        /** Word currently being drained by @ref serial_driver_read. */
         uint32_t rx_output_staged_word;
+        /** Remaining bytes in @ref rx_output_staged_word. */
         size_t rx_output_staged_word_bytes;
+        /** True once this descriptor slot has been initialized. */
         bool initialized;
     } serial_descriptor_entry_t;
 
+    /** Driver-local descriptor table indexed by descriptor-1. */
     static serial_descriptor_entry_t serial_descriptor_map[UART_DEVICE_COUNT] =
         {0};
+    /** One-time gate for resetting shared driver state. */
     static bool serial_driver_common_initialized = false;
 
     extern uart_error_t serial_driver_hw_map_uart(size_t port_index,
                                                   uart_device_t *uart_device);
 
+    /** Resolve a descriptor to an initialized entry; otherwise return NULL. */
     static serial_descriptor_entry_t *
     serial_driver_get_entry(serial_descriptor_t descriptor)
     {
@@ -107,6 +137,11 @@ extern "C"
         return byte;
     }
 
+    /**
+     * @brief Reset all shared descriptor/device/FIFO state.
+     *
+     * This is called once lazily from @ref serial_port_init.
+     */
     static serial_driver_error_t serial_driver_common_init(void)
     {
         size_t index = 0U;
@@ -140,6 +175,9 @@ extern "C"
         return SERIAL_DRIVER_OK;
     }
 
+    /**
+     * @brief Validate descriptor state and mode, then return entry pointer.
+     */
     static serial_driver_error_t
     serial_driver_get_mode_entry(serial_descriptor_t descriptor,
                                  uart_port_mode_t mode,
@@ -172,6 +210,13 @@ extern "C"
         return SERIAL_DRIVER_OK;
     }
 
+    /**
+     * @brief Load one TX word to be drained into the device byte FIFO.
+     *
+     * Priority:
+     * 1) Keep draining any partially-filled input staged word.
+     * 2) Otherwise pop a full word from the TX queue.
+     */
     static serial_driver_error_t
     serial_driver_load_tx_staged_word(serial_descriptor_entry_t *entry,
                                       bool *out_no_data)
@@ -209,6 +254,9 @@ extern "C"
         return SERIAL_DRIVER_OK;
     }
 
+    /**
+     * @brief Move up to @p max_bytes from staged TX data into the device FIFO.
+     */
     static serial_driver_error_t
     serial_driver_transmit_to_device_fifo(serial_descriptor_entry_t *entry,
                                           size_t max_bytes,
@@ -257,6 +305,9 @@ extern "C"
         return SERIAL_DRIVER_OK;
     }
 
+    /**
+     * @brief Commit a fully-staged RX word into the software RX queue.
+     */
     static serial_driver_error_t
     serial_driver_flush_rx_staged_word(serial_descriptor_entry_t *entry,
                                        bool *out_queue_full)
@@ -284,6 +335,11 @@ extern "C"
         return SERIAL_DRIVER_ERROR_NOT_INITIALIZED;
     }
 
+    /**
+     * @brief Move bytes from device RX FIFO into staged/queued RX words.
+     *
+     * Bytes are packed in little-endian order into 32-bit words.
+     */
     static serial_driver_error_t
     serial_driver_receive_from_device_fifo(serial_descriptor_entry_t *entry,
                                            size_t max_bytes,

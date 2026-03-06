@@ -1,6 +1,144 @@
 #include "device_driver/device_driver.h"
 #include "device_driver/device_driver_internal.h"
 
+static bool serial_driver_escape_needs_encoding(uint8_t value)
+{
+    return value == SERIAL_DRIVER_ESCAPE_FRAME_FLAG ||
+           value == SERIAL_DRIVER_ESCAPE_BYTE;
+}
+
+serial_driver_error_t serial_driver_escape_encode(const uint8_t *data,
+                                                  size_t length,
+                                                  uint8_t *out_encoded,
+                                                  size_t out_encoded_capacity,
+                                                  size_t *out_encoded_length)
+{
+    size_t write_index = 0U;
+    uint8_t value = 0U;
+
+    if (out_encoded_length == NULL)
+    {
+        return SERIAL_DRIVER_ERROR_INVALID_ARG;
+    }
+    *out_encoded_length = 0U;
+
+    if ((length > 0U && data == NULL) ||
+        (out_encoded_capacity > 0U && out_encoded == NULL))
+    {
+        return SERIAL_DRIVER_ERROR_INVALID_ARG;
+    }
+
+    if (out_encoded_capacity < 2U)
+    {
+        return SERIAL_DRIVER_ERROR_TX_FULL;
+    }
+
+    out_encoded[write_index] = SERIAL_DRIVER_ESCAPE_FRAME_FLAG;
+    write_index += 1U;
+
+    for (int index = 0U; index < length; ++index)
+    {
+        value = data[index];
+        if (serial_driver_escape_needs_encoding(value))
+        {
+            if (write_index + 2U > out_encoded_capacity)
+            {
+                return SERIAL_DRIVER_ERROR_TX_FULL;
+            }
+            out_encoded[write_index] = SERIAL_DRIVER_ESCAPE_BYTE;
+            write_index += 1U;
+            out_encoded[write_index] =
+                (uint8_t)(value ^ SERIAL_DRIVER_ESCAPE_XOR);
+            write_index += 1U;
+            continue;
+        }
+
+        if (write_index + 1U > out_encoded_capacity)
+        {
+            return SERIAL_DRIVER_ERROR_TX_FULL;
+        }
+        out_encoded[write_index] = value;
+        write_index += 1U;
+    }
+
+    if (write_index + 1U > out_encoded_capacity)
+    {
+        return SERIAL_DRIVER_ERROR_TX_FULL;
+    }
+    out_encoded[write_index] = SERIAL_DRIVER_ESCAPE_FRAME_FLAG;
+    write_index += 1U;
+
+    *out_encoded_length = write_index;
+    return SERIAL_DRIVER_OK;
+}
+
+serial_driver_error_t serial_driver_escape_decode(const uint8_t *encoded,
+                                                  size_t encoded_length,
+                                                  uint8_t *out_decoded,
+                                                  size_t out_decoded_capacity,
+                                                  size_t *out_decoded_length)
+{
+    size_t write_index = 0U;
+    uint8_t value = 0U;
+
+    if (out_decoded_length == NULL)
+    {
+        return SERIAL_DRIVER_ERROR_INVALID_ARG;
+    }
+    *out_decoded_length = 0U;
+
+    if ((encoded_length > 0U && encoded == NULL) ||
+        (out_decoded_capacity > 0U && out_decoded == NULL))
+    {
+        return SERIAL_DRIVER_ERROR_INVALID_ARG;
+    }
+
+    if (encoded_length < 2U || encoded[0] != SERIAL_DRIVER_ESCAPE_FRAME_FLAG ||
+        encoded[encoded_length - 1U] != SERIAL_DRIVER_ESCAPE_FRAME_FLAG)
+    {
+        return SERIAL_DRIVER_ERROR_INVALID_ARG;
+    }
+
+    for (int index = 1U; index + 1U < encoded_length; ++index)
+    {
+        value = encoded[index];
+        if (value == SERIAL_DRIVER_ESCAPE_FRAME_FLAG)
+        {
+            return SERIAL_DRIVER_ERROR_INVALID_ARG;
+        }
+
+        if (value == SERIAL_DRIVER_ESCAPE_BYTE)
+        {
+            if (index + 2U > encoded_length)
+            {
+                return SERIAL_DRIVER_ERROR_INVALID_ARG;
+            }
+            if (index + 1U >= encoded_length - 1U)
+            {
+                return SERIAL_DRIVER_ERROR_INVALID_ARG;
+            }
+            index += 1U;
+            value = (uint8_t)(encoded[index] ^ SERIAL_DRIVER_ESCAPE_XOR);
+            if (value != SERIAL_DRIVER_ESCAPE_FRAME_FLAG &&
+                value != SERIAL_DRIVER_ESCAPE_BYTE)
+            {
+                return SERIAL_DRIVER_ERROR_INVALID_ARG;
+            }
+        }
+
+        if (write_index >= out_decoded_capacity)
+        {
+            return SERIAL_DRIVER_ERROR_RX_FULL;
+        }
+
+        out_decoded[write_index] = value;
+        write_index += 1U;
+    }
+
+    *out_decoded_length = write_index;
+    return SERIAL_DRIVER_OK;
+}
+
 serial_descriptor_t serial_port_init(serial_ports_t port, uart_port_mode_t mode)
 {
     size_t index = 0U;
@@ -59,11 +197,11 @@ serial_descriptor_t serial_port_init(serial_ports_t port, uart_port_mode_t mode)
 
             if (mode == UART_PORT_MODE_SERIAL &&
                 (serial_queue_init(
-                        &uart_device->tx_queue) != /* LCOV_EXCL_BR_LINE */
-                        UART_ERROR_NONE ||         /* LCOV_EXCL_BR_LINE */
-                    serial_queue_init(
-                        &uart_device->rx_queue) != /* LCOV_EXCL_BR_LINE */
-                        UART_ERROR_NONE))
+                     &uart_device->tx_queue) != /* LCOV_EXCL_BR_LINE */
+                     UART_ERROR_NONE ||         /* LCOV_EXCL_BR_LINE */
+                 serial_queue_init(
+                     &uart_device->rx_queue) != /* LCOV_EXCL_BR_LINE */
+                     UART_ERROR_NONE))
             {
                 serial_descriptor_map[index].initialized =
                     false;                        /* LCOV_EXCL_LINE */

@@ -3,7 +3,8 @@
 
 /**
  * @file device_driver.h
- * @brief Public API for the software serial TX queue.
+ * @brief Public API for UART descriptor initialization, serial I/O, and
+ * polling.
  */
 
 #include <stddef.h>
@@ -14,11 +15,19 @@ extern "C"
 {
 #endif
 #include "registers.h"
+
     /** Opaque serial-driver descriptor returned by @ref serial_port_init. */
     typedef uint32_t serial_descriptor_t;
 
 /** Sentinel for an invalid descriptor. */
 #define SERIAL_DESCRIPTOR_INVALID ((serial_descriptor_t)0U)
+
+/** Frame delimiter byte used by escape encoding. */
+#define SERIAL_DRIVER_ESCAPE_FRAME_FLAG 0x7EU
+/** Escape introducer byte used by escape encoding. */
+#define SERIAL_DRIVER_ESCAPE_BYTE 0x7DU
+/** XOR mask applied to escaped payload bytes. */
+#define SERIAL_DRIVER_ESCAPE_XOR 0x20U
 
     /**
      * @brief Serial driver status/error codes.
@@ -92,6 +101,54 @@ extern "C"
                                               size_t *out_bytes_written);
 
     /**
+     * @brief Encode one payload into an escaped frame.
+     *
+     * Output format:
+     * - leading @ref SERIAL_DRIVER_ESCAPE_FRAME_FLAG
+     * - payload bytes with special-byte escaping
+     * - trailing @ref SERIAL_DRIVER_ESCAPE_FRAME_FLAG
+     *
+     * Bytes equal to @ref SERIAL_DRIVER_ESCAPE_FRAME_FLAG or
+     * @ref SERIAL_DRIVER_ESCAPE_BYTE are emitted as two bytes:
+     * escape byte followed by payload byte XORed with
+     * @ref SERIAL_DRIVER_ESCAPE_XOR.
+     *
+     * @param data Raw payload bytes.
+     * @param length Number of payload bytes.
+     * @param out_encoded Destination buffer for escaped frame bytes.
+     * @param out_encoded_capacity Capacity of @p out_encoded in bytes.
+     * @param out_encoded_length Output escaped frame length on success.
+     * @return @ref SERIAL_DRIVER_OK on success.
+     * @return @ref SERIAL_DRIVER_ERROR_TX_FULL when destination capacity is too
+     * small.
+     * @return @ref SERIAL_DRIVER_ERROR_INVALID_ARG for invalid parameters.
+     */
+    serial_driver_error_t serial_driver_escape_encode(
+        const uint8_t *data, size_t length, uint8_t *out_encoded,
+        size_t out_encoded_capacity, size_t *out_encoded_length);
+
+    /**
+     * @brief Decode one escaped frame into raw payload bytes.
+     *
+     * Input must contain exactly one frame delimited by leading and trailing
+     * @ref SERIAL_DRIVER_ESCAPE_FRAME_FLAG.
+     *
+     * @param encoded Escaped frame bytes.
+     * @param encoded_length Number of bytes in @p encoded.
+     * @param out_decoded Destination buffer for decoded payload.
+     * @param out_decoded_capacity Capacity of @p out_decoded in bytes.
+     * @param out_decoded_length Output decoded payload length on success.
+     * @return @ref SERIAL_DRIVER_OK on success.
+     * @return @ref SERIAL_DRIVER_ERROR_RX_FULL when destination capacity is too
+     * small.
+     * @return @ref SERIAL_DRIVER_ERROR_INVALID_ARG for invalid parameters or
+     * malformed frame data.
+     */
+    serial_driver_error_t serial_driver_escape_decode(
+        const uint8_t *encoded, size_t encoded_length, uint8_t *out_decoded,
+        size_t out_decoded_capacity, size_t *out_decoded_length);
+
+    /**
      * @brief Read received bytes into a user buffer.
      *
      * @param descriptor Initialized serial descriptor.
@@ -123,7 +180,7 @@ extern "C"
     serial_driver_disable_loopback(serial_descriptor_t descriptor);
 
     /**
-     * @brief Assert the discrete control line bit (#RTS) for a discrete
+     * @brief Assert the discrete control line bit (RTS) for a discrete
      * descriptor.
      *
      * @param descriptor Serial descriptor.
@@ -133,7 +190,7 @@ extern "C"
     serial_driver_enable_discrete(serial_descriptor_t descriptor);
 
     /**
-     * @brief De-assert the discrete control line bit (#RTS) for a discrete
+     * @brief De-assert the discrete control line bit (RTS) for a discrete
      * descriptor.
      *
      * @param descriptor Serial descriptor.

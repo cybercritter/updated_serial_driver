@@ -276,3 +276,120 @@ TEST_F(SerialDriverApiTest, InvalidDescriptorReturnsNotInitialized)
     EXPECT_EQ(serial_driver_enable_discrete(SERIAL_DESCRIPTOR_INVALID),
               SERIAL_DRIVER_ERROR_NOT_INITIALIZED);
 }
+
+TEST_F(SerialDriverApiTest, EscapeEncodeDecodeRoundTripWithReservedBytes)
+{
+    const std::array<uint8_t, 5> payload{{0x01U,
+                                          SERIAL_DRIVER_ESCAPE_FRAME_FLAG,
+                                          0x22U,
+                                          SERIAL_DRIVER_ESCAPE_BYTE,
+                                          0x33U}};
+    const std::array<uint8_t, 9> expected_encoded{
+        {SERIAL_DRIVER_ESCAPE_FRAME_FLAG,
+         0x01U,
+         SERIAL_DRIVER_ESCAPE_BYTE,
+         (uint8_t)(SERIAL_DRIVER_ESCAPE_FRAME_FLAG ^ SERIAL_DRIVER_ESCAPE_XOR),
+         0x22U,
+         SERIAL_DRIVER_ESCAPE_BYTE,
+         (uint8_t)(SERIAL_DRIVER_ESCAPE_BYTE ^ SERIAL_DRIVER_ESCAPE_XOR),
+         0x33U,
+         SERIAL_DRIVER_ESCAPE_FRAME_FLAG}};
+    std::array<uint8_t, 16> encoded{{0U}};
+    std::array<uint8_t, 8> decoded{{0U}};
+    size_t encoded_length = 0U;
+    size_t decoded_length = 0U;
+
+    ASSERT_EQ(serial_driver_escape_encode(payload.data(), payload.size(),
+                                          encoded.data(), encoded.size(),
+                                          &encoded_length),
+              SERIAL_DRIVER_OK);
+    ASSERT_EQ(encoded_length, expected_encoded.size());
+    for (size_t i = 0U; i < expected_encoded.size(); ++i)
+    {
+        EXPECT_EQ(encoded[i], expected_encoded[i]);
+    }
+
+    ASSERT_EQ(serial_driver_escape_decode(encoded.data(), encoded_length,
+                                          decoded.data(), decoded.size(),
+                                          &decoded_length),
+              SERIAL_DRIVER_OK);
+    ASSERT_EQ(decoded_length, payload.size());
+    for (size_t i = 0U; i < payload.size(); ++i)
+    {
+        EXPECT_EQ(decoded[i], payload[i]);
+    }
+}
+
+TEST_F(SerialDriverApiTest, EscapeEncodeDecodeValidateArgsAndCapacity)
+{
+    const std::array<uint8_t, 2> payload{{0x11U, SERIAL_DRIVER_ESCAPE_BYTE}};
+    std::array<uint8_t, 8> encoded{{0U}};
+    std::array<uint8_t, 2> decoded{{0U}};
+    size_t out_length = 0U;
+
+    EXPECT_EQ(serial_driver_escape_encode(nullptr, 1U, encoded.data(),
+                                          encoded.size(), &out_length),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+    EXPECT_EQ(serial_driver_escape_encode(payload.data(), payload.size(), nullptr,
+                                          encoded.size(), &out_length),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+    EXPECT_EQ(serial_driver_escape_encode(payload.data(), payload.size(),
+                                          encoded.data(), 2U, &out_length),
+              SERIAL_DRIVER_ERROR_TX_FULL);
+    EXPECT_EQ(out_length, 0U);
+
+    EXPECT_EQ(serial_driver_escape_decode(nullptr, 2U, decoded.data(),
+                                          decoded.size(), &out_length),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+    EXPECT_EQ(serial_driver_escape_decode(encoded.data(), 2U, nullptr,
+                                          decoded.size(), &out_length),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+    EXPECT_EQ(serial_driver_escape_decode(encoded.data(), 1U, decoded.data(),
+                                          decoded.size(), &out_length),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+}
+
+TEST_F(SerialDriverApiTest, EscapeDecodeRejectsMalformedFrames)
+{
+    const std::array<uint8_t, 4> bad_unescaped_flag{
+        {SERIAL_DRIVER_ESCAPE_FRAME_FLAG, 0x11U,
+         SERIAL_DRIVER_ESCAPE_FRAME_FLAG, SERIAL_DRIVER_ESCAPE_FRAME_FLAG}};
+    const std::array<uint8_t, 3> bad_trailing_escape{
+        {SERIAL_DRIVER_ESCAPE_FRAME_FLAG, SERIAL_DRIVER_ESCAPE_BYTE,
+         SERIAL_DRIVER_ESCAPE_FRAME_FLAG}};
+    const std::array<uint8_t, 4> bad_escape_value{
+        {SERIAL_DRIVER_ESCAPE_FRAME_FLAG, SERIAL_DRIVER_ESCAPE_BYTE, 0x55U,
+         SERIAL_DRIVER_ESCAPE_FRAME_FLAG}};
+    const std::array<uint8_t, 3> no_start_flag{
+        {0x01U, 0x02U, SERIAL_DRIVER_ESCAPE_FRAME_FLAG}};
+    const std::array<uint8_t, 5> good_frame{
+        {SERIAL_DRIVER_ESCAPE_FRAME_FLAG, 0x11U, 0x22U, 0x33U,
+         SERIAL_DRIVER_ESCAPE_FRAME_FLAG}};
+    std::array<uint8_t, 2> too_small_output{{0U}};
+    std::array<uint8_t, 8> decoded{{0U}};
+    size_t out_length = 0U;
+
+    EXPECT_EQ(serial_driver_escape_decode(bad_unescaped_flag.data(),
+                                          bad_unescaped_flag.size(),
+                                          decoded.data(), decoded.size(),
+                                          &out_length),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+    EXPECT_EQ(serial_driver_escape_decode(bad_trailing_escape.data(),
+                                          bad_trailing_escape.size(),
+                                          decoded.data(), decoded.size(),
+                                          &out_length),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+    EXPECT_EQ(serial_driver_escape_decode(bad_escape_value.data(),
+                                          bad_escape_value.size(),
+                                          decoded.data(), decoded.size(),
+                                          &out_length),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+    EXPECT_EQ(serial_driver_escape_decode(no_start_flag.data(),
+                                          no_start_flag.size(), decoded.data(),
+                                          decoded.size(), &out_length),
+              SERIAL_DRIVER_ERROR_INVALID_ARG);
+    EXPECT_EQ(serial_driver_escape_decode(good_frame.data(), good_frame.size(),
+                                          too_small_output.data(),
+                                          too_small_output.size(), &out_length),
+              SERIAL_DRIVER_ERROR_RX_FULL);
+}

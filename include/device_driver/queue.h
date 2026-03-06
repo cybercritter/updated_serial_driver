@@ -12,7 +12,7 @@
 
 #include "device_driver/errors.h"
 
-/** Fixed queue storage size in 32-bit entries 300 entries(1.2K byte). */
+/** Fixed queue storage size in 32-bit entries (300 words, 1.2 KB). */
 #define SERIAL_QUEUE_FIXED_SIZE_WORDS 300U
 
 /**
@@ -66,7 +66,7 @@ uart_error_t serial_queue_pop(serial_queue_t *queue, uint32_t *out_value);
 size_t serial_queue_size(const serial_queue_t *queue);
 
 /**
- * @brief Return whether queue has no queued bytes.
+ * @brief Return whether queue has no queued words.
  *
  * @param queue Queue context.
  * @return true if queue is empty or invalid; otherwise false.
@@ -74,7 +74,7 @@ size_t serial_queue_size(const serial_queue_t *queue);
 bool serial_queue_is_empty(const serial_queue_t *queue);
 
 /**
- * @brief Return whether queue cannot accept more bytes.
+ * @brief Return whether queue cannot accept more words.
  *
  * @param queue Queue context.
  * @return true if queue is full; otherwise false.
