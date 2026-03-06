@@ -1,4 +1,11 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=cybercritter_updated_serial_driver&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=cybercritter_updated_serial_driver)
+[![Lines of Code](https://sonarcloud.io/api/project_badges/measure?project=cybercritter_updated_serial_driver&metric=ncloc)](https://sonarcloud.io/summary/new_code?id=cybercritter_updated_serial_driver)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=cybercritter_updated_serial_driver&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=cybercritter_updated_serial_driver)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=cybercritter_updated_serial_driver&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=cybercritter_updated_serial_driver)
+[![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=cybercritter_updated_serial_driver&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=cybercritter_updated_serial_driver)
+
+
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=cybercritter_updated_serial_driver&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=cybercritter_updated_serial_driver)
 
 # updated_device_driver
 
