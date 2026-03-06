@@ -1,3 +1,5 @@
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=cybercritter_updated_serial_driver&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=cybercritter_updated_serial_driver)
+
 # updated_device_driver
 
 16550 / XR17C358-style UART driver in C with CMake-based builds and GoogleTest
