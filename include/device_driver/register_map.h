@@ -501,6 +501,8 @@ typedef struct XR17V358RegisterMap
 #define XR17C358_REGISTER_MAP_BYTES XR17V358_REGISTER_MAP_BYTES
 #define XR17C358_FIFO_DEPTH XR17V358_FIFO_DEPTH
 
+/* Overall types defined for the register map */
+
 typedef xr17v358_device_config_registers_t xr17c358_device_config_registers_t;
 typedef xr17v358_channel_register_map_t xr17c358_channel_register_map_t;
 
