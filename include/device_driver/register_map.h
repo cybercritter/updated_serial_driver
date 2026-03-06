@@ -392,10 +392,7 @@ typedef struct XR17V358UartChannelRegisters
     xr17v358_flow_control_4_reg_t flow_control_4;
 } xr17v358_uart_channel_registers_t;
 
-/**
- * @brief XR17V358 device-configuration register block (offsets 0x80-0x9A).
- */
-typedef struct XR17V358DeviceConfigurationRegisters
+typedef struct XR17V358DeviceConfigurationGenericRegisters_t
 {
     volatile uint8_t int0;
     volatile uint8_t int1;
@@ -412,6 +409,10 @@ typedef struct XR17V358DeviceConfigurationRegisters
     volatile uint8_t drev;
     volatile uint8_t dvid;
     volatile uint8_t regb;
+} XR17V358DeviceConfigurationGenericRegisters_t;
+
+typedef struct XR17V358DeviceConfigurationMPIORegisters
+{
     volatile uint8_t mpioint_7_0;
     volatile uint8_t mpiolvl_7_0;
     volatile uint8_t mpio3t_7_0;
@@ -424,7 +425,21 @@ typedef struct XR17V358DeviceConfigurationRegisters
     volatile uint8_t mpioinv_15_8;
     volatile uint8_t mpiosel_15_8;
     volatile uint8_t mpiood_15_8;
+
+} XR17V358DeviceConfigurationMPIORegisters_t;
+
+/**
+ * @brief XR17V358 device-configuration register block (offsets 0x80-0x9A).
+ */
+typedef struct XR17V358DeviceConfigurationRegisters
+{
+    XR17V358DeviceConfigurationGenericRegisters_t generic;
+    XR17V358DeviceConfigurationMPIORegisters_t mpio;
+
 } xr17v358_device_config_registers_t;
+
+typedef XR17V358DeviceConfigurationGenericRegisters_t
+    xr17c358_device_config_registers_t;
 
 /**
  * @brief XR17V358 direct FIFO window (offset 0x100-0x1FF).

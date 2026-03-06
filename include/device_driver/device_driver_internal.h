@@ -173,6 +173,43 @@ extern "C"
     }
 
     static serial_driver_error_t
+    serial_driver_load_tx_staged_word(serial_descriptor_entry_t *entry,
+                                      bool *out_no_data)
+    {
+        uint32_t word = 0U;
+        uart_error_t queue_error = UART_ERROR_NONE;
+
+        *out_no_data = false;
+
+        if (serial_queue_size(&entry->uart_device->tx_queue) ==
+                0U && /* LCOV_EXCL_BR_LINE */
+            entry->tx_input_staged_word_bytes > 0U)
+        {
+            entry->staged_word = entry->tx_input_staged_word;
+            entry->staged_word_bytes = entry->tx_input_staged_word_bytes;
+            entry->tx_input_staged_word = 0U;
+            entry->tx_input_staged_word_bytes = 0U;
+            return SERIAL_DRIVER_OK;
+        }
+
+        queue_error = serial_queue_pop(&entry->uart_device->tx_queue,
+                                       &word);          /* LCOV_EXCL_BR_LINE */
+        if (queue_error == UART_ERROR_FIFO_QUEUE_EMPTY) /* LCOV_EXCL_BR_LINE */
+        {
+            *out_no_data = true;
+            return SERIAL_DRIVER_OK;
+        }
+        if (queue_error != UART_ERROR_NONE)
+        {
+            return SERIAL_DRIVER_ERROR_NOT_INITIALIZED;
+        }
+
+        entry->staged_word = word;
+        entry->staged_word_bytes = sizeof(uint32_t);
+        return SERIAL_DRIVER_OK;
+    }
+
+    static serial_driver_error_t
     serial_driver_transmit_to_device_fifo(serial_descriptor_entry_t *entry,
                                           size_t max_bytes,
                                           size_t *out_bytes_transmitted)
@@ -180,8 +217,8 @@ extern "C"
         uart_byte_fifo_t *fifo = NULL;
         size_t fifo_index = 0U;
         size_t bytes_transmitted = 0U;
-        uint32_t word = 0U;
-        uart_error_t queue_error = UART_ERROR_NONE;
+        bool tx_data_unavailable = false;
+        serial_driver_error_t status = SERIAL_DRIVER_OK;
 
         if (out_bytes_transmitted == NULL)
         {
@@ -197,33 +234,15 @@ extern "C"
         {
             if (entry->staged_word_bytes == 0U)
             {
-                if (serial_queue_size(&entry->uart_device->tx_queue) ==
-                        0U && /* LCOV_EXCL_BR_LINE */
-                    entry->tx_input_staged_word_bytes > 0U)
+                status = serial_driver_load_tx_staged_word(
+                    entry, &tx_data_unavailable);
+                if (status != SERIAL_DRIVER_OK)
                 {
-                    entry->staged_word = entry->tx_input_staged_word;
-                    entry->staged_word_bytes =
-                        entry->tx_input_staged_word_bytes;
-                    entry->tx_input_staged_word = 0U;
-                    entry->tx_input_staged_word_bytes = 0U;
+                    return status;
                 }
-                else
+                if (tx_data_unavailable)
                 {
-                    queue_error =
-                        serial_queue_pop(&entry->uart_device->tx_queue,
-                                         &word); /* LCOV_EXCL_BR_LINE */
-                    if (queue_error ==
-                        UART_ERROR_FIFO_QUEUE_EMPTY) /* LCOV_EXCL_BR_LINE */
-                    {
-                        break;
-                    }
-                    if (queue_error != UART_ERROR_NONE)
-                    {
-                        return SERIAL_DRIVER_ERROR_NOT_INITIALIZED;
-                    }
-
-                    entry->staged_word = word;
-                    entry->staged_word_bytes = sizeof(uint32_t);
+                    break;
                 }
             }
 

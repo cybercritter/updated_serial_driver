@@ -26,15 +26,58 @@
     "CPACK",
     "CTEST",
     "Doxyfile",
+    "dvid",
+    "DVID",
     "gcda",
     "gcov",
     "GCOVR",
-    "STREQ"
+    "mpio",
+    "MPIO",
+    "mpioint",
+    "MPIOINT",
+    "mpioinv",
+    "MPIOINV",
+    "mpiolvl",
+    "MPIOLVL",
+    "mpiood",
+    "MPIOOD",
+    "mpiosel",
+    "MPIOSEL",
+    "rega",
+    "REGA",
+    "regb",
+    "REGB",
+    "rxtrg",
+    "RXTRG",
+    "timerlsb",
+    "TIMERLSB",
+    "timermsb",
+    "TIMERMSB",
+    "xchar",
+    "XCHAR",
+    "XMODE",
+    "xoffrcvd",
+    "XOFFRCVD",
+    "xonrcvd",
+    "XONRCVD"
   ],
   "sonarlint.connectedMode.project": {
     "connectionId": "cybercritter",
     "projectKey": "cybercritter_updated_serial_driver"
   },
   "cSpell.words": ["CPACK", "CTEST", "Doxyfile", "gcda", "gcov", "GCOVR"],
-  "gtest-adapter.debugConfig": ["(gdb) Launch"]
+  "gtest-adapter.debugConfig": [
+    "(gdb) Launch"
+  ],
+  "cSpell.customDictionaries": {
+    "custom-dictionary-workspace": {
+      "name": "custom-dictionary-workspace",
+      "path": "${workspaceFolder:updated_device_driver}/.cspell/custom-dictionary-workspace.txt",
+      "addWords": true,
+      "scope": "workspace"
+    }
+  },
+  "cSpell.ignoreWords": [
+    "mpioinv"
+  ]
 }
